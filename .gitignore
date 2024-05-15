@@ -1,0 +1,8 @@
+.vs/
+src/SMCodesRenderEngine/out/build/x64-debug/
+src/SMCodesRenderEngine/out/build/x64-release/
+src/SMCodesRenderEngine/out/build/x86-debug/
+src/SMCodesRenderEngine/out/build/x86-release/
+.idea/
+cmake-build-debug/
+
