@@ -259,9 +259,6 @@ void HelloTriangleApplication::DestroyDebugUtilsMessengerEXT(VkInstance instance
     }
 }
 
-
-
-
 // #endregion
 
 // #region Public Methods
@@ -271,14 +268,5 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
-
-
-
-
-
-
-
-
-
 
 // #endregion
