@@ -22,15 +22,21 @@ public:
 private:
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> presentFamily;
         
         bool isComplete() const{
-            return graphicsFamily.has_value();
+            return graphicsFamily.has_value() && presentFamily.has_value();
         }
     };
 
     GLFWwindow *window;
     VkInstance vulkanInstance;
     VkDebugUtilsMessengerEXT vulkanDebugMessenger;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkDevice device;
+    VkQueue graphicsQueue;
+    VkSurfaceKHR surface;
+    VkQueue presentQueue;
 
     void initWindow();
 
@@ -68,9 +74,13 @@ private:
 
     void pickPhysicalDevice();
 
-    static bool isDeviceSuitable(VkPhysicalDevice device);
+    bool isDeviceSuitable(VkPhysicalDevice device);
     
-    static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+    
+    void createLogicalDevice();
+    
+    void createSurface();
 };
 
 
