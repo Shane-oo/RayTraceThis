@@ -28,6 +28,16 @@ private:
             return graphicsFamily.has_value() && presentFamily.has_value();
         }
     };
+    
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+        
+        bool isAdequate() const {
+            return !formats.empty() && !presentModes.empty();
+        }
+    };
 
     GLFWwindow *window;
     VkInstance vulkanInstance;
@@ -37,6 +47,10 @@ private:
     VkQueue graphicsQueue;
     VkSurfaceKHR surface;
     VkQueue presentQueue;
+    VkSwapchainKHR swapChain;
+    std::vector<VkImage> swapChainImages;
+    VkFormat swapChainImageFormat;
+    VkExtent2D swapChainExtent;
 
     void initWindow();
 
@@ -74,13 +88,25 @@ private:
 
     void pickPhysicalDevice();
 
-    bool isDeviceSuitable(VkPhysicalDevice device);
+    bool isDeviceSuitable(VkPhysicalDevice physDevice);
     
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+    static bool checkDeviceExtensionSupport(VkPhysicalDevice physDevice);
+    
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physDevice);
     
     void createLogicalDevice();
     
     void createSurface();
+    
+    void createSwapChain();
+    
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice physDevice);
+    
+    static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+    
+    static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+    
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 };
 
 
