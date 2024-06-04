@@ -9,6 +9,7 @@
 #include <vulkan/vulkan_core.h>
 #include <vector>
 #include <optional>
+#include <string>
 
 class GLFWwindow;
 
@@ -110,6 +111,10 @@ private:
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
     void createImageViews();
+    
+    void createGraphicsPipeline();
+    
+
 };
 
 

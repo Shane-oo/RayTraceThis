@@ -9,6 +9,21 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
+# run commands
+if(WIN32)
+  execute_process(COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} cmd.exe /c "shader_compiler.bat"
+          RESULT_VARIABLE result
+          OUTPUT_VARIABLE output
+          ERROR_VARIABLE error_output
+  )
+  if(result EQUAL 0)
+    message(STATUS "Shaders Compiled Successfully")
+  else()
+    message(FATAL_ERROR "Error executing Shader Compiler: ${error_output}")
+  endif()
+endif()
+
+
 project ("SMCodesRenderEngine")
 
 # Include sub-projects.

@@ -13,6 +13,7 @@
 #include <iostream>
 #include <set>
 #include <algorithm>
+#include <fstream>
 
 // #region Constants
 
@@ -36,6 +37,25 @@ const bool enableValidationLayers = true;
 // #endregion
 
 // #region Private Methods
+
+static std::vector<char> readFile(const std::string& fileName){
+    std::ifstream file(fileName, std::ios::ate | std::ios::binary);
+    
+    if(!file.is_open()){
+        throw std::runtime_error("Failed to open file: " + fileName);
+    }
+    
+    size_t fileSize = (size_t) file.tellg();
+    std::vector<char> buffer(fileSize);
+    
+    file.seekg(0);
+    file.read(buffer.data(), (std::streamsize)fileSize);
+    
+    file.close();
+    
+    return buffer;
+}
+
 
 void HelloTriangleApplication::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo) {
     createInfo = {};
@@ -71,6 +91,7 @@ void HelloTriangleApplication::initVulkan() {
     createLogicalDevice();
     createSwapChain();
     createImageViews();
+    createGraphicsPipeline();
 }
 
 void HelloTriangleApplication::mainLoop() {
@@ -650,6 +671,15 @@ void HelloTriangleApplication::createImageViews() {
     }
 }
 
+void HelloTriangleApplication::createGraphicsPipeline() {
+    auto vertexShader = readFile("shaders/hello_triangle_application.vert.spv");
+    auto fragmentShader = readFile("shaders/hello_triangle_application.frag.spv");
+    
+    std::cout << "VertexShader Size: " << vertexShader.size() << std::endl;
+    std::cout << "FragmentShader Size: " << fragmentShader.size() << std::endl;
+}
+
+
 // #endregion
 
 // #region Public Methods
@@ -659,6 +689,7 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
+
 
 
 
