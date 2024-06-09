@@ -53,7 +53,11 @@ private:
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
-
+    VkRenderPass renderPass;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline graphicsPipeline;
+    std::vector<VkFramebuffer> swapChainFramebuffers;
+    
     void initWindow();
 
     void initVulkan();
@@ -112,9 +116,11 @@ private:
 
     void createImageViews();
     
+    void createRenderPass();
+    
     void createGraphicsPipeline();
     
-
+    VkShaderModule createShaderModule(const std::vector<char>& shaderCode);
 };
 
 
