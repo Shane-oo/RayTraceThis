@@ -57,6 +57,8 @@ private:
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
     std::vector<VkFramebuffer> swapChainFramebuffers;
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
     
     void initWindow();
 
@@ -123,6 +125,12 @@ private:
     VkShaderModule createShaderModule(const std::vector<char>& shaderCode);
     
     void createFramebuffers();
+    
+    void createCommandPool();
+    
+    void createCommandBuffer();
+    
+    void recordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex);
 };
 
 

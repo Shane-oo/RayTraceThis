@@ -94,6 +94,8 @@ void HelloTriangleApplication::initVulkan() {
     createRenderPass();
     createGraphicsPipeline();
     createFramebuffers();
+    createCommandPool();
+    createCommandBuffer();
 }
 
 void HelloTriangleApplication::mainLoop() {
@@ -105,7 +107,9 @@ void HelloTriangleApplication::mainLoop() {
 }
 
 void HelloTriangleApplication::cleanUp() {
-    for(auto framebuffer: swapChainFramebuffers){
+    vkDestroyCommandPool(device, commandPool, nullptr);
+
+    for (auto framebuffer: swapChainFramebuffers) {
         vkDestroyFramebuffer(device, framebuffer, nullptr);
     }
 
@@ -765,20 +769,6 @@ void HelloTriangleApplication::createGraphicsPipeline() {
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // triangle from every 3 vertices without reuse
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    // Viewports and scissors ( region of the framebuffer that the output will be rendered to)
-    // usually always (0,0) to (width, height)
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float) swapChainExtent.width;
-    viewport.height = (float) swapChainExtent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = swapChainExtent;
-
-
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
@@ -951,6 +941,112 @@ void HelloTriangleApplication::createFramebuffers() {
     }
 }
 
+void HelloTriangleApplication::createCommandPool() {
+    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
+
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Allow command buffers to be rerecorded individually
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+    VkResult createCommandPoolResult = vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool);
+    if (createCommandPoolResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create command pool!");
+    }
+
+    std::cout << "Successfully created Command Pool" << std::endl;
+}
+
+
+void HelloTriangleApplication::createCommandBuffer() {
+    VkCommandBufferAllocateInfo allocateBufferInfo{};
+    allocateBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocateBufferInfo.commandPool = commandPool;
+    allocateBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // can be submitted to a queue for execution, but cannot be called from other command buffers
+    allocateBufferInfo.commandBufferCount = 1; // only allocating one command buffer
+
+    VkResult allocateBufferInfoResult = vkAllocateCommandBuffers(device, &allocateBufferInfo, &commandBuffer);
+    if (allocateBufferInfoResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate command buffers");
+    }
+
+    std::cout << "Successfully allocated command buffers" << std::endl;
+}
+
+void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex) {
+    VkCommandBufferBeginInfo beginCommandBufferInfo{};
+    beginCommandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginCommandBufferInfo.flags = 0; // Optional
+    beginCommandBufferInfo.pInheritanceInfo = nullptr; // Optional
+
+    VkResult beginCommandBufferResult = vkBeginCommandBuffer(cmdBuffer, &beginCommandBufferInfo);
+    if (beginCommandBufferResult != VK_SUCCESS) {
+        throw std::runtime_error("failed to begin recording command buffer");
+    }
+
+    std::cout << "Successfully began recording Command Buffer" << std::endl;
+
+    // Start a render Pass
+    // We created a framebuffer for each swap chain image where it is specified
+    // as a color attachment, thus we need to bind the framebuffer for the swapchain image
+    // we want to draw to
+    VkRenderPassBeginInfo renderPassBeginInfo{};
+    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassBeginInfo.renderPass = renderPass;
+    renderPassBeginInfo.framebuffer = swapChainFramebuffers[imageIndex];
+    renderPassBeginInfo.renderArea.offset = {0, 0};
+    renderPassBeginInfo.renderArea.extent = swapChainExtent;
+
+    // define the clear values to use for VK_ATTACHMENT_LOAD_OP_CLEAR
+    // which we used as load operation for the color attachment
+    VkClearValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};   // black with 100% opacity
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearColor;
+
+    vkCmdBeginRenderPass(cmdBuffer,
+                         &renderPassBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+    // VK_SUBPASS_CONTENTS_INLINE = render pass commands will be embedded in the primary command buffer itself
+    // and no secondary command buffers will be executed
+
+    // Basic Drawing commands
+    // Bind the graphics pipeline
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+    // Because we specified viewport and scissor as dynamic in pipeline
+    // we need to set them before issuing our draw command
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>( swapChainExtent.width);
+    viewport.height = static_cast<float>(swapChainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = swapChainExtent;
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+    // finally the draw command for the triangle
+    uint32_t vertexCount = 3;
+    uint32_t instanceCount = 1; // used for instanced rendering, use 1 if not doing that
+    uint32_t firstVertex = 0; // Used as an offset in the vertex buffer, defines the lowest value of gl_VertexIndex
+    uint32_t firstInstance = 0; // Used as an offset for instanced rendering, defines the lowest value of gl_InstanceIndex
+    vkCmdDraw(cmdBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+
+    // End render pass
+    vkCmdEndRenderPass(cmdBuffer);
+
+    // End Command Buffer
+    VkResult endCommandBufferResult = vkEndCommandBuffer(cmdBuffer);
+    if (endCommandBufferResult != VK_SUCCESS) {
+        throw std::runtime_error("failed to record command buffer");
+    }
+
+    std::cout << "Successfully Recorded Command Buffer" << std::endl;
+}
 
 
 
@@ -963,8 +1059,6 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
-
-
 
 
 
