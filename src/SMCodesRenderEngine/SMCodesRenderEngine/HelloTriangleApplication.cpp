@@ -93,7 +93,7 @@ void HelloTriangleApplication::initVulkan() {
     createImageViews();
     createRenderPass();
     createGraphicsPipeline();
-    createFrameBuffers();
+    createFramebuffers();
 }
 
 void HelloTriangleApplication::mainLoop() {
@@ -105,6 +105,10 @@ void HelloTriangleApplication::mainLoop() {
 }
 
 void HelloTriangleApplication::cleanUp() {
+    for(auto framebuffer: swapChainFramebuffers){
+        vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
+
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
@@ -773,7 +777,7 @@ void HelloTriangleApplication::createGraphicsPipeline() {
     VkRect2D scissor{};
     scissor.offset = {0, 0};
     scissor.extent = swapChainExtent;
-    
+
 
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -812,7 +816,8 @@ void HelloTriangleApplication::createGraphicsPipeline() {
 
     // Color blending
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE; // new color from the fragment shader is passed through unmodified
     colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
     colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
@@ -842,8 +847,8 @@ void HelloTriangleApplication::createGraphicsPipeline() {
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-    dynamicState.pDynamicStates = dynamicStates.data(); 
-    
+    dynamicState.pDynamicStates = dynamicStates.data();
+
     // Pipeline Layout (for uniform values in shaders)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo;
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -861,8 +866,8 @@ void HelloTriangleApplication::createGraphicsPipeline() {
     if (pipelineLayoutCreateResult != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout");
     }
-    
-    std::cout<< "Successfully created pipeline layout"<< std::endl;
+
+    std::cout << "Successfully created pipeline layout" << std::endl;
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -915,6 +920,38 @@ VkShaderModule HelloTriangleApplication::createShaderModule(const std::vector<ch
 
     return shaderModule;
 }
+
+
+void HelloTriangleApplication::createFramebuffers() {
+    swapChainFramebuffers.resize(swapChainImages.size());
+    // iterate through the image views and create framebuffers from them
+    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+        VkImageView attachments[] = {
+                swapChainImageViews[i]
+        };
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = swapChainExtent.width;
+        framebufferInfo.height = swapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        VkResult frameBufferCreateResult = vkCreateFramebuffer(device,
+                                                               &framebufferInfo,
+                                                               nullptr,
+                                                               &swapChainFramebuffers[i]);
+        if (frameBufferCreateResult != VK_SUCCESS) {
+            throw std::runtime_error("failed to create framebuffer");
+        }
+
+        std::cout << "Created Frame Buffer for swapChainImageViews[" << i << "]" << std::endl;
+    }
+}
+
+
 
 
 // #endregion
