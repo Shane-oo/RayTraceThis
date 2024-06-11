@@ -150,6 +150,8 @@ void HelloTriangleApplication::cleanUp() {
     glfwDestroyWindow(window);
 
     glfwTerminate();
+
+    std::cout << "Cleaned Up" << std::endl;
 }
 
 void HelloTriangleApplication::createVulkanInstance() {
@@ -579,6 +581,18 @@ void HelloTriangleApplication::createSwapChain() {
 }
 
 void HelloTriangleApplication::recreateSwapChain() {
+    // handle window minimized (frame buffer size of 0) 
+    int width = 0;
+    int height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+
+        std::cout << "Window minimized waiting for it to come back into foreground..." << std::endl;
+    }
+
+
     // don't touch resources that may still be in use
     vkDeviceWaitIdle(device);
 
@@ -1077,7 +1091,7 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
         throw std::runtime_error("failed to begin recording command buffer");
     }
 
-    std::cout << "Successfully began recording Command Buffer for frame " << currentFrame << std::endl;
+    //std::cout << "Successfully began recording Command Buffer for frame " << currentFrame << std::endl;
 
     // Start a render Pass
     // We created a framebuffer for each swap chain image where it is specified
@@ -1138,7 +1152,7 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
         throw std::runtime_error("failed to record command buffer");
     }
 
-    std::cout << "Successfully Recorded Command Buffer" << std::endl;
+    //std::cout << "Successfully Recorded Command Buffer" << std::endl;
 }
 
 
@@ -1196,7 +1210,7 @@ void HelloTriangleApplication::drawFrame() {
         throw std::runtime_error("failed to submit draw command buffer");
     }
 
-    std::cout << "Successfully submitted draw command buffer" << std::endl;
+    //std::cout << "Successfully submitted draw command buffer" << std::endl;
 
     // - Present the swap chain image
     VkPresentInfoKHR presentInfo{};
