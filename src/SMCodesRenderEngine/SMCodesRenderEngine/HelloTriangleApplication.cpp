@@ -17,6 +17,8 @@
 
 // #region Constants
 
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
@@ -95,7 +97,7 @@ void HelloTriangleApplication::initVulkan() {
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
-    createCommandBuffer();
+    createCommandBuffers();
     createSyncObjects();
 }
 
@@ -111,9 +113,11 @@ void HelloTriangleApplication::mainLoop() {
 }
 
 void HelloTriangleApplication::cleanUp() {
-    vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-    vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-    vkDestroyFence(device, inFlightFence, nullptr);
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+        vkDestroyFence(device, inFlightFences[i], nullptr);
+    }
 
     vkDestroyCommandPool(device, commandPool, nullptr);
 
@@ -730,7 +734,7 @@ void HelloTriangleApplication::createRenderPass() {
     // when we want to start writing colors to it
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    
+
     // Render pass
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -980,14 +984,16 @@ void HelloTriangleApplication::createCommandPool() {
 }
 
 
-void HelloTriangleApplication::createCommandBuffer() {
+void HelloTriangleApplication::createCommandBuffers() {
+    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
     VkCommandBufferAllocateInfo allocateBufferInfo{};
     allocateBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocateBufferInfo.commandPool = commandPool;
     allocateBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // can be submitted to a queue for execution, but cannot be called from other command buffers
-    allocateBufferInfo.commandBufferCount = 1; // only allocating one command buffer
+    allocateBufferInfo.commandBufferCount = (uint32_t) commandBuffers.size();
 
-    VkResult allocateBufferInfoResult = vkAllocateCommandBuffers(device, &allocateBufferInfo, &commandBuffer);
+    VkResult allocateBufferInfoResult = vkAllocateCommandBuffers(device, &allocateBufferInfo, commandBuffers.data());
     if (allocateBufferInfoResult != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffers");
     }
@@ -996,6 +1002,10 @@ void HelloTriangleApplication::createCommandBuffer() {
 }
 
 void HelloTriangleApplication::createSyncObjects() {
+    imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -1004,22 +1014,25 @@ void HelloTriangleApplication::createSyncObjects() {
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // fence created in signaled state
     // so that the first call to vkWaitForFences() returns immediately
 
-    VkResult createimageAvailableSemaphoreResult = vkCreateSemaphore(device,
-                                                                     &semaphoreInfo,
-                                                                     nullptr,
-                                                                     &imageAvailableSemaphore);
-    VkResult createRenderFinishedSemaphoreResult = vkCreateSemaphore(device,
-                                                                     &semaphoreInfo,
-                                                                     nullptr,
-                                                                     &renderFinishedSemaphore);
-    VkResult createInFlightFenceResult = vkCreateFence(device,
-                                                       &fenceInfo,
-                                                       nullptr,
-                                                       &inFlightFence);
-    if (createimageAvailableSemaphoreResult != VK_SUCCESS
-        || createRenderFinishedSemaphoreResult != VK_SUCCESS
-        || createInFlightFenceResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create Semaphores Or Fence");
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        VkResult createimageAvailableSemaphoreResult = vkCreateSemaphore(device,
+                                                                         &semaphoreInfo,
+                                                                         nullptr,
+                                                                         &imageAvailableSemaphores[i]);
+        VkResult createRenderFinishedSemaphoreResult = vkCreateSemaphore(device,
+                                                                         &semaphoreInfo,
+                                                                         nullptr,
+                                                                         &renderFinishedSemaphores[i]);
+        VkResult createInFlightFenceResult = vkCreateFence(device,
+                                                           &fenceInfo,
+                                                           nullptr,
+                                                           &inFlightFences[i]);
+        if (createimageAvailableSemaphoreResult != VK_SUCCESS
+            || createRenderFinishedSemaphoreResult != VK_SUCCESS
+            || createInFlightFenceResult != VK_SUCCESS) {
+            throw std::runtime_error(&"Failed to create Semaphores Or Fence. index: "[i]);
+        }
+
     }
 
     std::cout << "Successfully created Semaphores and Fence" << std::endl;
@@ -1036,7 +1049,7 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
         throw std::runtime_error("failed to begin recording command buffer");
     }
 
-    //std::cout << "Successfully began recording Command Buffer" << std::endl;
+    std::cout << "Successfully began recording Command Buffer for frame " << currentFrame << std::endl;
 
     // Start a render Pass
     // We created a framebuffer for each swap chain image where it is specified
@@ -1097,25 +1110,26 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
         throw std::runtime_error("failed to record command buffer");
     }
 
-    //std::cout << "Successfully Recorded Command Buffer" << std::endl;
+    std::cout << "Successfully Recorded Command Buffer" << std::endl;
 }
 
 
 void HelloTriangleApplication::drawFrame() {
     // Rendering a frame in Vulkan consists of:
     // - Wait for the previous frame to finish
-    vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
+    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     // done waiting
-    vkResetFences(device, 1, &inFlightFence);
+    vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
     // - Acquire an image from the swap chain
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE,
+                          &imageIndex);
 
     // - Record a command buffer which draws the scene onto that image
-    vkResetCommandBuffer(commandBuffer, 0); // make sure command buffer is able to be recorded to
+    vkResetCommandBuffer(commandBuffers[currentFrame], 0); // make sure command buffer is able to be recorded to
 
-    recordCommandBuffer(commandBuffer, imageIndex);
+    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
     // - Submit the recorded command buffer
     VkSubmitInfo submitInfo{};
@@ -1123,45 +1137,48 @@ void HelloTriangleApplication::drawFrame() {
 
     // we want to wait with writing colors to the image until its available
     // so we're specifying the stage of the graphics pipeline that writes to the color attachment
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
 
     // specify which semaphores to signal once the command buffer(s) have finished execution
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    VkResult queueSubmitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence);
+    VkResult queueSubmitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]);
     if (queueSubmitResult != VK_SUCCESS) {
         throw std::runtime_error("failed to submit draw command buffer");
     }
 
-    //std::cout << "Successfully submitted draw command buffer" << std::endl;
+    std::cout << "Successfully submitted draw command buffer" << std::endl;
 
     // - Present the swap chain image
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     // we ant to wait on the command buffer to finish execution
-    presentInfo.waitSemaphoreCount =1;
+    presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
-    
+
     // specify the swap chains to present images to 
     // and the index of the image for each swap chain
     VkSwapchainKHR swapChains[] = {swapChain};
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
-    
+
     presentInfo.pResults = nullptr; // Optional
 
     // submits the request to present an image to the swap chain
     vkQueuePresentKHR(presentQueue, &presentInfo);
+
+    // advance to the next frame
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 
