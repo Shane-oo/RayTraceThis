@@ -14,8 +14,7 @@
 class GLFWwindow;
 
 class HelloTriangleApplication {
-    
-    
+
 
 public:
     void run();
@@ -24,17 +23,17 @@ private:
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
         std::optional<uint32_t> presentFamily;
-        
-        bool isComplete() const{
+
+        bool isComplete() const {
             return graphicsFamily.has_value() && presentFamily.has_value();
         }
     };
-    
+
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR capabilities;
         std::vector<VkSurfaceFormatKHR> formats;
         std::vector<VkPresentModeKHR> presentModes;
-        
+
         bool isAdequate() const {
             return !formats.empty() && !presentModes.empty();
         }
@@ -64,7 +63,11 @@ private:
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
     
+    bool frameBufferResized = false;
+
     void initWindow();
+    
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 
     void initVulkan();
 
@@ -101,43 +104,47 @@ private:
     void pickPhysicalDevice();
 
     bool isDeviceSuitable(VkPhysicalDevice physDevice);
-    
+
     static bool checkDeviceExtensionSupport(VkPhysicalDevice physDevice);
-    
+
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physDevice);
-    
+
     void createLogicalDevice();
-    
+
     void createSurface();
-    
+
     void createSwapChain();
+
+    void recreateSwapChain();
     
+    void cleanupSwapChain();
+
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice physDevice);
-    
-    static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-    
-    static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-    
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+
+    static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
+
+    static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
+
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
     void createImageViews();
-    
+
     void createRenderPass();
-    
+
     void createGraphicsPipeline();
-    
-    VkShaderModule createShaderModule(const std::vector<char>& shaderCode);
-    
+
+    VkShaderModule createShaderModule(const std::vector<char> &shaderCode);
+
     void createFramebuffers();
-    
+
     void createCommandPool();
-    
+
     void createCommandBuffers();
-    
+
     void recordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex);
-    
+
     void drawFrame();
-    
+
     void createSyncObjects();
 };
 

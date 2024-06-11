@@ -79,10 +79,20 @@ void HelloTriangleApplication::initWindow() {
     // tell glfw not to create the default OpenGL context
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    // for now disable window resize events
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    // allow window resize events
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
     window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+
+    glfwSetWindowUserPointer(window, this);
+    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+}
+
+void HelloTriangleApplication::framebufferResizeCallback(GLFWwindow *window, int width, int height) {
+    std::cout << "Framebuffer resized" << std::endl;
+
+    auto app = reinterpret_cast<HelloTriangleApplication *>(glfwGetWindowUserPointer(window));
+    app->frameBufferResized = true;
 }
 
 void HelloTriangleApplication::initVulkan() {
@@ -121,19 +131,12 @@ void HelloTriangleApplication::cleanUp() {
 
     vkDestroyCommandPool(device, commandPool, nullptr);
 
-    for (auto framebuffer: swapChainFramebuffers) {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
-    }
+    cleanupSwapChain();
 
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
 
-    for (auto imageView: swapChainImageViews) {
-        vkDestroyImageView(device, imageView, nullptr);
-    }
-
-    vkDestroySwapchainKHR(device, swapChain, nullptr);
     vkDestroyDevice(device, nullptr);
 
     if (enableValidationLayers) {
@@ -573,6 +576,31 @@ void HelloTriangleApplication::createSwapChain() {
     // store format and extent, will need in future
     swapChainImageFormat = surfaceFormat.format;
     swapChainExtent = extent;
+}
+
+void HelloTriangleApplication::recreateSwapChain() {
+    // don't touch resources that may still be in use
+    vkDeviceWaitIdle(device);
+
+    std::cout << "Recreating swap chain" << std::endl;
+
+    cleanupSwapChain();
+
+    createSwapChain();
+    createImageViews();
+    createFramebuffers();
+}
+
+void HelloTriangleApplication::cleanupSwapChain() {
+    for (auto framebuffer: swapChainFramebuffers) {
+        vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
+
+    for (auto imageView: swapChainImageViews) {
+        vkDestroyImageView(device, imageView, nullptr);
+    }
+
+    vkDestroySwapchainKHR(device, swapChain, nullptr);
 }
 
 HelloTriangleApplication::SwapChainSupportDetails
@@ -1118,13 +1146,25 @@ void HelloTriangleApplication::drawFrame() {
     // Rendering a frame in Vulkan consists of:
     // - Wait for the previous frame to finish
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-    // done waiting
-    vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
     // - Acquire an image from the swap chain
+    // Check if Vulkan is telling us that the swap chain is no linger adequate (i.e. window resize)
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE,
-                          &imageIndex);
+    VkResult acquireNextImageResult = vkAcquireNextImageKHR(device,
+                                                            swapChain,
+                                                            UINT64_MAX,
+                                                            imageAvailableSemaphores[currentFrame],
+                                                            VK_NULL_HANDLE,
+                                                            &imageIndex);
+    if (acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreateSwapChain();
+        return;
+    } else if (acquireNextImageResult != VK_SUCCESS && acquireNextImageResult != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("failed to acquire swap chain image");
+    }
+
+    // done waiting - only reset the fence if we are submitting work
+    vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
     // - Record a command buffer which draws the scene onto that image
     vkResetCommandBuffer(commandBuffers[currentFrame], 0); // make sure command buffer is able to be recorded to
@@ -1175,7 +1215,14 @@ void HelloTriangleApplication::drawFrame() {
     presentInfo.pResults = nullptr; // Optional
 
     // submits the request to present an image to the swap chain
-    vkQueuePresentKHR(presentQueue, &presentInfo);
+    VkResult queuePresentResult = vkQueuePresentKHR(presentQueue, &presentInfo);
+    if (queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR || queuePresentResult == VK_SUBOPTIMAL_KHR ||
+        frameBufferResized) {
+        frameBufferResized = false;
+        recreateSwapChain();
+    } else if (queuePresentResult != VK_SUCCESS) {
+        throw std::runtime_error("failed to present swap chain image");
+    }
 
     // advance to the next frame
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
