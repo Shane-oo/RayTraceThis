@@ -107,6 +107,7 @@ void HelloTriangleApplication::initVulkan() {
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
+    createVertexBuffer();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -123,6 +124,8 @@ void HelloTriangleApplication::mainLoop() {
 }
 
 void HelloTriangleApplication::cleanUp() {
+    vkDestroyBuffer(device, vertexBuffer, nullptr);
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -828,7 +831,7 @@ void HelloTriangleApplication::createGraphicsPipeline() {
 
     auto bindingDescription = Vertex::getBindingDescription();
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription; 
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
 
     auto attributeDescription = Vertex::getAttributeDescriptions();
     vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size());
@@ -1247,6 +1250,22 @@ void HelloTriangleApplication::drawFrame() {
 }
 
 
+void HelloTriangleApplication::createVertexBuffer() {
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = sizeof(vertices[0]) * vertices.size(); // size of the buffer in bytes
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    // just like images in the swap chain, buffers can also be owned by a specific queue family
+    // or be shared between multiple at the same time
+    // for now buffer will only be used form the graphics queue, so we can stick to exclusive access
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkResult createVertexBufferResult = vkCreateBuffer(device, &bufferInfo, nullptr, &vertexBuffer);
+    if (createVertexBufferResult != VK_SUCCESS) {
+        throw std::runtime_error("failed to create vertex buffer!");
+    }
+
+}
 
 
 
@@ -1259,13 +1278,5 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
-
-
-
-
-
-
-
-
 
 // #endregion
