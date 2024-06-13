@@ -10,6 +10,9 @@
 #include <vector>
 #include <optional>
 #include <string>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <array>
 
 class GLFWwindow;
 
@@ -62,12 +65,11 @@ private:
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
-    
     bool frameBufferResized = false;
 
     void initWindow();
-    
-    static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
+
+    static void framebufferResizeCallback(GLFWwindow *window, int width, int height);
 
     void initVulkan();
 
@@ -116,7 +118,7 @@ private:
     void createSwapChain();
 
     void recreateSwapChain();
-    
+
     void cleanupSwapChain();
 
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice physDevice);
@@ -146,6 +148,55 @@ private:
     void drawFrame();
 
     void createSyncObjects();
+
+private:
+    struct Vertex {
+        glm::vec2 pos;
+        glm::vec3 colour;
+
+
+        static VkVertexInputBindingDescription getBindingDescription() {
+            // describes at which rate to load data from memory throughout the vertices.
+            // Specifies the number of bytes between data entries and whether
+            // to move to the next data entry after each vertex or after each instance
+            VkVertexInputBindingDescription bindingDescription{};
+
+            bindingDescription.binding = 0; // index of the binding in the array of bindings
+            bindingDescription.stride = sizeof(Vertex); // the number of bytes from one entry to the next
+            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // Move to the next data entry after each vertex
+
+
+            return bindingDescription;
+        }
+
+        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
+            // describes how to extract a vertex attribute from a chunk of vertex data originating from a binding description
+            // we have two attributes, position and color, so we need two attribute description structs
+            std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+
+            // position
+            attributeDescriptions[0].binding = 0; // which binding the per-vertex data comes
+            attributeDescriptions[0].location = 0; // references the location directive of the input in the vertex shader
+            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+            // the number of bytes since the start of the per-vertex data to read from
+            attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+            // colour
+            attributeDescriptions[1].binding = 0;
+            attributeDescriptions[1].location = 1;
+            attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributeDescriptions[1].offset = offsetof(Vertex, colour);
+            
+            return attributeDescriptions;
+        }
+    };
+
+    const std::vector<Vertex> vertices = {
+            {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    };
+
 };
 
 
