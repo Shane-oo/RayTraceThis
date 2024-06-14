@@ -29,8 +29,8 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_TOOLCHAIN_FILE": {
           "type": "PATH",
-          //"value": "E:/Programs/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          "value": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          "value": "C://Users/shane/Documents/repos/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          //"value": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
         }
       }
     },
@@ -42,8 +42,8 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_TOOLCHAIN_FILE": {
           "type": "PATH",
-          //"value": "E:/Programs/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          "value": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          "value": "C://Users/shane/Documents/repos/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          //"value": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
         }
       }
     },
@@ -59,8 +59,8 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_TOOLCHAIN_FILE": {
           "type": "PATH",
-          //"value": "E:/Programs/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          "value": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          "value": "C://Users/shane/Documents/repos/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          //"value": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
         }
       }
     },
@@ -72,8 +72,8 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_TOOLCHAIN_FILE": {
           "type": "PATH",
-          //"value": "E:/Programs/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          "value": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          "value": "C://Users/shane/Documents/repos/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          //"value": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
         }
       }
     }

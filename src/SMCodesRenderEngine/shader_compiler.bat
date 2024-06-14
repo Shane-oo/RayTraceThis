@@ -2,7 +2,8 @@
 setlocal enabledelayedexpansion
 
 :: Define the path to the glslc compiler
-set GLSLC=C:\VulkanSDK\1.3.275.0\Bin\glslc.exe
+::set GLSLC=C:\VulkanSDK\1.3.275.0\Bin\glslc.exe
+set GLSLC=C:\Program Files\VulkanSDK\1.3.283.0\Bin\glslc.exe
 
 :: Define the shaders folder
 set SHADERS_DIR=SMCodesRenderEngine\shaders
@@ -15,8 +16,10 @@ for %%f in (%SHADERS_DIR%\*.frag %SHADERS_DIR%\*.vert) do (
     if "%%~xf"==".frag" set STAGE=fragment
 
     if defined STAGE (
+        
         echo Compiling %%f as !STAGE! shader
-        %GLSLC% -fshader-stage=!STAGE! %%f -o %%f.spv
+        :: Had to add "" around %GLSLC% for it to work for my path that has space "Program Files"
+        "%GLSLC%" -fshader-stage=!STAGE! %%f -o %%f.spv
     ) else (
         echo Skipping %%f: Unknown shader stage
     )
