@@ -6,3 +6,6 @@ src/SMCodesRenderEngine/out/build/x86-release/
 .idea/
 cmake-build-debug/
 
+src/RayTraceThis.Net/RayTraceThis.Net.WebApi/appsettings.Development.json
+src/RayTraceThis.Net/RayTraceThis.Net.WebApi/bin
+src/RayTraceThis.Net/RayTraceThis.Net.WebApi/obj

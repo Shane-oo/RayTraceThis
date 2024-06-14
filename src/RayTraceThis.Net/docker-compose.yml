@@ -1,0 +1,6 @@
+﻿services:
+  raytracethis.net.webapi:
+    image: raytracethis.net.webapi
+    build:
+      context: .
+      dockerfile: RayTraceThis.Net.WebApi/Dockerfile

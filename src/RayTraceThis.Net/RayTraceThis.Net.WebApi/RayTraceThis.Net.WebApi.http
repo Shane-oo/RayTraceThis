@@ -1,0 +1,6 @@
+@RayTraceThis.Net.WebApi_HostAddress = http://localhost:5224
+
+GET {{RayTraceThis.Net.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
