@@ -8,4 +8,7 @@
 
     <toc-element topic="Idea.md"/>
     <toc-element topic="CPP-Renderer-Setup.md"/>
+    <toc-element topic="RayTraceThis-Angular.md">
+        <toc-element topic="Deployment.md"/>
+    </toc-element>
 </instance-profile>
