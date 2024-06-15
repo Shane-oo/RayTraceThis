@@ -110,6 +110,7 @@ void HelloTriangleApplication::initVulkan() {
     createFramebuffers();
     createCommandPool();
     createVertexBuffer();
+    createIndexBuffer();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -126,6 +127,9 @@ void HelloTriangleApplication::mainLoop() {
 }
 
 void HelloTriangleApplication::cleanUp() {
+    vkDestroyBuffer(device, indexBuffer, nullptr);
+    vkFreeMemory(device, indexBufferMemory, nullptr);
+
     vkDestroyBuffer(device, vertexBuffer, nullptr);
     vkFreeMemory(device, vertexBufferMemory, nullptr);
 
@@ -1150,10 +1154,18 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
 
+    vkCmdBindIndexBuffer(cmdBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
     uint32_t instanceCount = 1; // used for instanced rendering, use 1 if not doing that
-    uint32_t firstVertex = 0; // Used as an offset in the vertex buffer, defines the lowest value of gl_VertexIndex
+    uint32_t firstIndex = 0;
+    int32_t vertexOffset = 0;
     uint32_t firstInstance = 0; // Used as an offset for instanced rendering, defines the lowest value of gl_InstanceIndex
-    vkCmdDraw(cmdBuffer, static_cast<uint32_t>(vertices.size()), instanceCount, firstVertex, firstInstance);
+    vkCmdDrawIndexed(cmdBuffer,
+                     static_cast<uint32_t>(indices.size()),
+                     instanceCount,
+                     firstIndex,
+                     vertexOffset,
+                     firstInstance);
 
     // End render pass
     vkCmdEndRenderPass(cmdBuffer);
@@ -1374,7 +1386,32 @@ void HelloTriangleApplication::createVertexBuffer() {
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
+void HelloTriangleApplication::createIndexBuffer() {
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer,
+                 stagingBufferMemory);
+
+    void *data;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, indices.data(), (size_t) bufferSize);
+
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                 indexBuffer,
+                 indexBufferMemory);
+
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
 
 // #endregion
 
@@ -1385,6 +1422,8 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
+
+
 
 
 
