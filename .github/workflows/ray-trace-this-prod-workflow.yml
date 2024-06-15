@@ -21,6 +21,9 @@ jobs:
       - name: Checkot GitHub Repo
         uses: actions/checkout@v4
 
+      - name: Do Secret Check
+        run: echo ${{ secrets.REGISTRY_LOGIN_SERVER }}
+
       - name: Login via Azure CLI
         uses: azure/login@v2
         with:
