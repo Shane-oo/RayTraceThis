@@ -2,7 +2,7 @@ name: Build and deploy RayTraceThis
 
 env:
   AZURE_WEBAPP_NAME: your-app-name  # set this to the name of your Azure Web App
-  RAYTRACETHIS_ANGULAR_CONTAINER_NAME: RayTraceThis.Angular
+  RAYTRACETHIS_ANGULAR_CONTAINER_NAME: ray-trace-this-angular
 on:
   push:
     branches: [ "main" ]
