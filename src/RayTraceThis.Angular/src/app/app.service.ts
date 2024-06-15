@@ -17,6 +17,6 @@ export class AppService {
   }
 
   WeatherForecast() {
-    return this.http.get<WeatherForecast[]>('https://localhost:7076/weatherforecast');
+    return this.http.get<WeatherForecast[]>('https://localhost:8080/weatherforecast');
   }
 }

@@ -1,6 +1,40 @@
 ﻿services:
   raytracethis.net.webapi:
     image: raytracethis.net.webapi
+    container_name: RayTraceThis.Net.WebApi
     build:
       context: .
       dockerfile: RayTraceThis.Net.WebApi/Dockerfile
+    ports:
+      - 8080:8080
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:8080
+      - ASPNETCORE_HTTPS_PORT=8080
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=Password123!
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+    volumes:
+      - ~/.aspnet/https:/https:ro
+
+  raytracethis.angular:
+    image: raytracethis.angular
+    container_name: RayTraceThis.Angular
+    build:
+      context: ../RayTraceThis.Angular/
+      dockerfile: Dockerfile
+    ports:
+      - 4000:4000
+  
+  raytracethis.db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: RayTraceThis.DB
+    environment:
+      SA_PASSWORD: "Password123!"
+      ACCEPT_EULA: "Y"
+    volumes:
+      - ./.containers/database:/var/lib/sqlserver/data
+      - ./.containers/database:/var/lib/sqlserver/log
+      - ./.containers/database:/var/lib/sqlserver/secrets
+
+    ports:
+      - 1433:1433
