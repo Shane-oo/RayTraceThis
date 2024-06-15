@@ -125,6 +125,7 @@ void HelloTriangleApplication::mainLoop() {
 
 void HelloTriangleApplication::cleanUp() {
     vkDestroyBuffer(device, vertexBuffer, nullptr);
+    vkFreeMemory(device, vertexBufferMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
@@ -279,14 +280,13 @@ VkBool32 HelloTriangleApplication::debugCallback(VkDebugUtilsMessageSeverityFlag
                                                  VkDebugUtilsMessageTypeFlagsEXT messageType,
                                                  const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
                                                  void *pUserData) {
-
     if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         // Message is important enough to show
         switch (messageType) {
             case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
-                std::cout << "Some event has happened that is unrelated to the specification or performance"
-                          << std::endl;
-                break;
+                /*std::cout << "Some event has happened that is unrelated to the specification or performance"
+                          << std::endl;*/
+                return VK_FALSE;
             case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT:
                 std::cout << "Something has happened that violates the specification or indicates a possible mistake"
                           << std::endl;
@@ -1144,11 +1144,14 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     // finally the draw command for the triangle
-    uint32_t vertexCount = 3;
+    VkBuffer vertexBuffers[] = {vertexBuffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
+
     uint32_t instanceCount = 1; // used for instanced rendering, use 1 if not doing that
     uint32_t firstVertex = 0; // Used as an offset in the vertex buffer, defines the lowest value of gl_VertexIndex
     uint32_t firstInstance = 0; // Used as an offset for instanced rendering, defines the lowest value of gl_InstanceIndex
-    vkCmdDraw(cmdBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+    vkCmdDraw(cmdBuffer, static_cast<uint32_t>(vertices.size()), instanceCount, firstVertex, firstInstance);
 
     // End render pass
     vkCmdEndRenderPass(cmdBuffer);
@@ -1249,6 +1252,20 @@ void HelloTriangleApplication::drawFrame() {
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
+uint32_t HelloTriangleApplication::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+        // typeFilter is used to specify the bit field of memory types that are suitable
+        if (typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            // if there is memory type suitable for the buffer that also has all the properties we need
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type");
+}
 
 void HelloTriangleApplication::createVertexBuffer() {
     VkBufferCreateInfo bufferInfo{};
@@ -1265,6 +1282,31 @@ void HelloTriangleApplication::createVertexBuffer() {
         throw std::runtime_error("failed to create vertex buffer!");
     }
 
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(device, vertexBuffer, &memoryRequirements);
+
+    VkMemoryAllocateInfo memoryAllocateInfo{};
+    memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memoryAllocateInfo.allocationSize = memoryRequirements.size;
+    memoryAllocateInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits,
+                                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                                        | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    VkResult allocateVertexBufferMemoryResult = vkAllocateMemory(device,
+                                                                 &memoryAllocateInfo,
+                                                                 nullptr,
+                                                                 &vertexBufferMemory);
+    if (allocateVertexBufferMemoryResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate vertex buffer memory");
+    }
+
+    vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+
+    // Filling the vertex Buffer
+    void *data;
+    vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+    memcpy(data, vertices.data(), (size_t) bufferInfo.size);
+    vkUnmapMemory(device, vertexBufferMemory);
 }
 
 
@@ -1278,5 +1320,6 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
+
 
 // #endregion

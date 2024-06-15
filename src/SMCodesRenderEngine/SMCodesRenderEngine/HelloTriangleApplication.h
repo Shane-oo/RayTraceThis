@@ -148,6 +148,8 @@ private:
     void drawFrame();
 
     void createSyncObjects();
+    
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 private:
     struct Vertex {
@@ -197,6 +199,7 @@ private:
             {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
     };
     VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
 
     void createVertexBuffer();
 };
