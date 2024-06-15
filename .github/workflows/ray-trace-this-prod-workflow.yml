@@ -25,9 +25,6 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-          
-      - name: Change Directory to RayTraceThis.Angular 
-        run: cd src/RayTraceThis.Angular
     
       - name: Build and Push Image to container Registry
         uses: docker/login-action@v3
@@ -36,6 +33,7 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
       - run: |
+          cd src/RayTraceThis.Angular
           docker build -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ env.RAYTRACETHIS_ANGULAR_CONTAINER_NAME }}:${{ github.sha }} --file Dockerfile .
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ env.RAYTRACETHIS_ANGULAR_CONTAINER_NAME }}:${{ github.sha }}
 
