@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-and-push-angular-app-to-container-registry:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,37 +25,32 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-          
-      - name: Change Directory to RayTraceThis.Angular 
-        run: cd src/RayTraceThis.Angular
     
-      - name: Build and Push Image to container Registry
+      - name: Docker Login into Azure Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.REGISTRY_LOGIN_SERVER }}
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
-      - run: |
+
+      - name: Build and Push Image to container Registry      
+        run: |
+          cd src/RayTraceThis.Angular
           docker build -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ env.RAYTRACETHIS_ANGULAR_CONTAINER_NAME }}:${{ github.sha }} --file Dockerfile .
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ env.RAYTRACETHIS_ANGULAR_CONTAINER_NAME }}:${{ github.sha }}
 
-#  deploy:
-#    permissions:
-#      contents: none
-#    runs-on: ubuntu-latest
-#    needs: build
-#    environment:
-#      name: 'Development'
-#      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+  set-angular-web-app-to-new-image:
+    runs-on: ubuntu-latest
+    needs: [ build-and-push-angular-app-to-container-registry ]
+    steps:
 
-#    steps:
-#      - name: Lowercase the repo name and username
-#        run: echo "REPO=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+    - name: Login via Azure CLI
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-#      - name: Deploy to Azure Web App
-#        id: deploy-to-webapp
-#        uses: azure/webapps-deploy@v2
-#        with:
-#          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-#          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-#          images: 'ghcr.io/${{ env.REPO }}:${{ github.sha }}'
+    - name: Update ray-trace-this-angular-web-app
+      uses: azure/webapps-deploy@v3
+      with: 
+        app-name: ray-trace-this-angular-web-app
+        images: ${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ env.RAYTRACETHIS_ANGULAR_CONTAINER_NAME }}:${{ github.sha }}
