@@ -1,4 +1,35 @@
 <div>
   <h4>Welcome, raytracethis.com/raytracing.graphics coming soon</h4>
 </div>
+
+<input type="text" (keyup)="changeTitle($event)">
+
+{{ title() }}
+
+@for (user of users(); track user.id) {
+  <div>
+    {{ user.name }}
+  </div>
+}
+
+{{usersTotal()}}
+
+
+<button (click)="getWeather()">Get Weather</button>
+<button (click)="addToWeather()">Add to Weather</button>
+
+@for (weather of weather(); track weather.date){
+  <div>
+    <span>Date: {{weather.date}}</span>
+    <span>TempC: {{weather.temperatureC}}</span>
+    <span>TempF: {{weather.temperatureF}}</span>
+    <span>Summary: {{weather.summary}}</span>
+  </div>
+} @empty {
+  <div>
+    No weather yet
+  </div>
+}
+{{weatherTotal()}}
+
 <router-outlet/>

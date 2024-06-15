@@ -1,12 +1,25 @@
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+
+// Cors
+builder.Services.AddCors(o =>
+                         {
+                             o.AddPolicy("CorsPolicy",p =>
+                                                      {
+                                                          p.AllowAnyMethod()
+                                                           .AllowAnyHeader()
+                                                           .AllowAnyOrigin();
+                                                      });
+                         });
+
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
 app.UseHttpsRedirection();
+
+app.UseCors("CorsPolicy");
 
 var summaries = new[]
                 {
