@@ -14,7 +14,7 @@
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
-      "launchBrowser": true,
+      "launchBrowser": false,
       "launchUrl": "weatherforecast",
       "applicationUrl": "https://localhost:8080;http://localhost:8081",
       "environmentVariables": {

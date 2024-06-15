@@ -9,3 +9,7 @@ cmake-build-debug/
 src/RayTraceThis.Net/RayTraceThis.Net.WebApi/appsettings.Development.json
 src/RayTraceThis.Net/RayTraceThis.Net.WebApi/bin
 src/RayTraceThis.Net/RayTraceThis.Net.WebApi/obj
+src/RayTraceThis.Net/RayTraceThis.Net.Identity/obj
+src/RayTraceThis.Net/RayTraceThis.Net.Identity/bin
+src/RayTraceThis.Net/RayTraceThis.Net.Core/obj
+src/RayTraceThis.Net/RayTraceThis.Net.Core/bin

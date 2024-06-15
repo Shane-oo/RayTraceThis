@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>disable</Nullable>
+        <RootNamespace>RayTraceThis.Net.Identity</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Carter" Version="8.2.1" />
+      <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\RayTraceThis.Net.Core\RayTraceThis.Net.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\RayTraceThis.Net.Core\RayTraceThis.Net.Core.csproj" />
+    </ItemGroup>
+
+</Project>
