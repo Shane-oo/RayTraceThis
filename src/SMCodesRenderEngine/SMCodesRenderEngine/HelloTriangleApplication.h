@@ -13,6 +13,7 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <array>
+#include <glm/ext/matrix_float4x4.hpp>
 
 class GLFWwindow;
 
@@ -219,6 +220,24 @@ private:
     void createVertexBuffer();
 
     void createIndexBuffer();
+    
+private: 
+    struct UniformBufferObject {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
+    };
+    
+    VkDescriptorSetLayout descriptorSetLayout;
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
+
+    void createDescriptorSetLayout();
+    
+    void createUniformBuffers();
+    
+    void updateUniformBuffer(uint32_t currentImage);
 };
 
 

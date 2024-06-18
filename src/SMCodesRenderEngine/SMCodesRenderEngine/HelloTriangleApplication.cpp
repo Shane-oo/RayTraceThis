@@ -5,7 +5,10 @@
 #include "HelloTriangleApplication.h"
 
 #define GLFW_INCLUDE_VULKAN
+#define GLM_FORCE_RADIANS
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <GLFW/glfw3.h>
 #include <cassert>
 #include <stdexcept>
@@ -14,6 +17,7 @@
 #include <set>
 #include <algorithm>
 #include <fstream>
+#include <chrono>
 
 // #region Constants
 
@@ -29,7 +33,8 @@ const std::vector<const char *> validationLayers = {
 const std::vector<const char *> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-        VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME
+        VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
+        //VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
 };
 
 #ifdef NDEBUG
@@ -106,11 +111,13 @@ void HelloTriangleApplication::initVulkan() {
     createSwapChain();
     createImageViews();
     createRenderPass();
+    createDescriptorSetLayout();
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
     createVertexBuffer();
     createIndexBuffer();
+    createUniformBuffers();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -134,6 +141,11 @@ void HelloTriangleApplication::cleanUp() {
     vkFreeMemory(device, vertexBufferMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+    }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
         vkDestroyFence(device, inFlightFences[i], nullptr);
@@ -142,6 +154,9 @@ void HelloTriangleApplication::cleanUp() {
     vkDestroyCommandPool(device, commandPool, nullptr);
 
     cleanupSwapChain();
+
+
+    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -923,8 +938,8 @@ void HelloTriangleApplication::createGraphicsPipeline() {
     // Pipeline Layout (for uniform values in shaders)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo;
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0; // Optional
-    pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
     pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
     pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
     pipelineLayoutInfo.pNext = nullptr;  // had to add this? not sure why
@@ -1201,6 +1216,8 @@ void HelloTriangleApplication::drawFrame() {
         throw std::runtime_error("failed to acquire swap chain image");
     }
 
+    updateUniformBuffer(currentFrame);
+
     // done waiting - only reset the fence if we are submitting work
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
@@ -1413,6 +1430,77 @@ void HelloTriangleApplication::createIndexBuffer() {
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
+void HelloTriangleApplication::createDescriptorSetLayout() {
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;  // (location = 0)
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1; // Our MVP transformation is in a single uniform buffer object
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    VkResult createDescriptorSetLayoutResult = vkCreateDescriptorSetLayout(device,
+                                                                           &layoutInfo,
+                                                                           nullptr,
+                                                                           &descriptorSetLayout);
+    if (createDescriptorSetLayoutResult != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+    }
+
+    std::cout << "descriptor set layout successfully created" << std::endl;
+}
+
+void HelloTriangleApplication::createUniformBuffers() {
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        createBuffer(bufferSize,
+                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     uniformBuffers[i],
+                     uniformBuffersMemory[i]);
+
+        vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+    }
+}
+
+void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage) {
+    // make geometry spin around
+
+    // time in seconds since rendering has started
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    UniformBufferObject ubo{};
+    // rotate around the z-axis
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.f), glm::vec3(0.f, 0.0f, 1.0f));
+
+    // view the geometry from above at a 45-degree angle
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    ubo.proj = glm::perspective(glm::radians(45.0f),
+                                (float) swapChainExtent.width / (float) swapChainExtent.height,
+                                0.1f,
+                                10.0f);
+
+    // GLM was originally designed for OpenGL, where the Y coordinate of the clip coordinates in inverted
+    // The easiest way to compensate for that is to flip the sign on the scaling factor of the Y axis in the projection matrix
+    ubo.proj[1][1] *= -1;
+
+    // copy data in the uniform buffer object to the current uniform buffer
+    memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+}
+
 // #endregion
 
 // #region Public Methods
@@ -1422,6 +1510,11 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
+
+
+
+
+
 
 
 
