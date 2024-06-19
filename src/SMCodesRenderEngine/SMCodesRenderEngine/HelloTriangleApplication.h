@@ -229,15 +229,23 @@ private:
     };
     
     VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    std::vector<VkDescriptorSet> descriptorSets;
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
     void createDescriptorSetLayout();
     
+    void createDescriptorPool();
+    
+    void createDescriptorSets();
+    
     void createUniformBuffers();
     
     void updateUniformBuffer(uint32_t currentImage);
+    
+    
 };
 
 
