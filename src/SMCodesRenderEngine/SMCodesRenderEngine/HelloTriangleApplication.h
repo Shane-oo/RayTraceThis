@@ -220,32 +220,40 @@ private:
     void createVertexBuffer();
 
     void createIndexBuffer();
-    
-private: 
+
+private:
+
+    /*
+     *  Scalars have to be aligned by N (= 4 bytes given 32-bit floats).
+     *  A vec2 must be aligned by 2N (= 8 bytes)
+     *  A vec3 or vec4 must be aligned by 4N (= 16 bytes)
+     *  A nested structure must be aligned by the base alignment of its members rounded up to a multiple of 16.
+     *  A mat4 matrix must have the same alignment as a vec4.
+     */
     struct UniformBufferObject {
-        glm::mat4 model;
-        glm::mat4 view;
-        glm::mat4 proj;
+        alignas(16) glm::mat4 model;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 proj;
     };
-    
+
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
-    std::vector<void*> uniformBuffersMapped;
+    std::vector<void *> uniformBuffersMapped;
 
     void createDescriptorSetLayout();
-    
+
     void createDescriptorPool();
-    
+
     void createDescriptorSets();
-    
+
     void createUniformBuffers();
-    
+
     void updateUniformBuffer(uint32_t currentImage);
-    
-    
+
+
 };
 
 
