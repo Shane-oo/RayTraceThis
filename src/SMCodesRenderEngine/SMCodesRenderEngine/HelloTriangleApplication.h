@@ -222,7 +222,6 @@ private:
     void createIndexBuffer();
 
 private:
-
     /*
      *  Scalars have to be aligned by N (= 4 bytes given 32-bit floats).
      *  A vec2 must be aligned by 2N (= 8 bytes)
@@ -252,8 +251,21 @@ private:
     void createUniformBuffers();
 
     void updateUniformBuffer(uint32_t currentImage);
-
-
+    
+private:
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
+    
+    void createTextureImage();
+    
+    void createImage(uint32_t width,
+                     uint32_t height,
+                     VkFormat format,
+                     VkImageTiling tiling,
+                     VkImageUsageFlags usage,
+                     VkMemoryPropertyFlags properties,
+                     VkImage& image,
+                     VkDeviceMemory& imageMemory);
 };
 
 

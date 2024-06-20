@@ -4,16 +4,17 @@
 
 # Copy the shaders folder to the build and binary directory 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/shaders DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
+# Copy the textures folder to the build and binary directory
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/textures DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # Add source to this project's executable.
-add_executable (SMCodesRenderEngine "SMCodesRenderEngine.cpp" "SMCodesRenderEngine.h"
+add_executable(SMCodesRenderEngine "SMCodesRenderEngine.cpp" "SMCodesRenderEngine.h"
         HelloTriangleApplication.cpp
         HelloTriangleApplication.h)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET SMCodesRenderEngine PROPERTY CXX_STANDARD 20)
-endif()
+    set_property(TARGET SMCodesRenderEngine PROPERTY CXX_STANDARD 20)
+endif ()
 
 #Find Vulkan
 find_package(Vulkan REQUIRED)
