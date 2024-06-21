@@ -7,9 +7,8 @@
 #define GLFW_INCLUDE_VULKAN
 #define GLM_FORCE_RADIANS
 
-#define STB_IMAGE_IMPLEMENTATION
 
-#include <stb_image.h>
+
 
 
 #include <glm/glm.hpp>
@@ -23,6 +22,9 @@
 #include <algorithm>
 #include <fstream>
 #include <chrono>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 // #region Constants
 
