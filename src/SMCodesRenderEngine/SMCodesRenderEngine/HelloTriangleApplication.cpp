@@ -1358,20 +1358,7 @@ void HelloTriangleApplication::createBuffer(VkDeviceSize size,
 }
 
 void HelloTriangleApplication::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    VkCommandBufferAllocateInfo bufferAllocateInfo{};
-    bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    bufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    bufferAllocateInfo.commandPool = commandPool;
-    bufferAllocateInfo.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device, &bufferAllocateInfo, &commandBuffer);
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // only going to use the command buffer once
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
     VkBufferCopy copyRegion{};
     copyRegion.srcOffset = 0; // Optional
@@ -1379,18 +1366,7 @@ void HelloTriangleApplication::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer
     copyRegion.size = size;
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
-    vkEndCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    // no events to wait on, want to execute the transfer on the buffers immediately 
-    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(graphicsQueue);
-
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    endSingleTimeCommands(commandBuffer);
 }
 
 void HelloTriangleApplication::createVertexBuffer() {
@@ -1630,6 +1606,22 @@ void HelloTriangleApplication::createTextureImage() {
                 textureImageMemory
     );
 
+    transitionImageLayout(textureImage,
+                          VK_FORMAT_R8G8B8A8_SRGB,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    copyBufferToImage(stagingBuffer,
+                      textureImage,
+                      static_cast<uint32_t>(textureWidth),
+                      static_cast<uint32_t>(textureHeight));
+
+
+    // prepare it for shader access
+    transitionImageLayout(textureImage,
+                          VK_FORMAT_R8G8B8A8_SRGB,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 
@@ -1679,6 +1671,133 @@ void HelloTriangleApplication::createImage(uint32_t width,
     vkBindImageMemory(device, image, imageMemory, 0);
 }
 
+void HelloTriangleApplication::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
+                                                     VkImageLayout newLayout) {
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkImageMemoryBarrier memoryBarrier{};
+    memoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    memoryBarrier.oldLayout = oldLayout;
+    memoryBarrier.newLayout = newLayout;
+
+    memoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    memoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    // specify the image that is affected and the specific part of the image
+    memoryBarrier.image = image;
+    memoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    memoryBarrier.subresourceRange.baseMipLevel = 0; // our image is not an array and does not have mipmapping levels
+    memoryBarrier.subresourceRange.levelCount = 1;
+    memoryBarrier.subresourceRange.baseArrayLayer = 0;
+    memoryBarrier.subresourceRange.layerCount = 1;
+
+    /*
+     *  Barriers are primarily used for synchronization purposes, so you must specify 
+     *  which types of operations that involve the resource must happen before the barrier,
+     *  and which operations that involve the resource must wait on the barrier.
+     *  We need to do that despite already using vkQueueWaitIdle to manually syn-chronize
+    */
+
+    memoryBarrier.srcAccessMask = 0; // TODO
+    memoryBarrier.dstAccessMask = 0; // TODO
+
+    VkPipelineStageFlags srcStageMask = 0; //todo // which pipeline stage the operations occur that should happen before the barrier
+    VkPipelineStageFlags dstStageMask = 0; //todo // the pipeline stage in which operations will wait on the barrier
+    VkDependencyFlags dependencyFlags = 0;
+    uint32_t memoryBarrierCount = 0;
+    VkMemoryBarrier *pMemoryBarriers = nullptr;
+    uint32_t bufferMemoryBarrierCount = 0;
+    VkBufferMemoryBarrier *pBufferMemoryBarriers = nullptr;
+    uint32_t imageMemoryBarrierCount = 1;
+    vkCmdPipelineBarrier(
+            commandBuffer,
+            srcStageMask,
+            dstStageMask,
+            dependencyFlags,
+            memoryBarrierCount,
+            pMemoryBarriers,
+            bufferMemoryBarrierCount,
+            pBufferMemoryBarriers,
+            imageMemoryBarrierCount,
+            &memoryBarrier
+    );
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+
+VkCommandBuffer HelloTriangleApplication::beginSingleTimeCommands() {
+    VkCommandBufferAllocateInfo allocateInfo{};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocateInfo.commandPool = commandPool;
+    allocateInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    VkResult allocateCommandBufferResult = vkAllocateCommandBuffers(device, &allocateInfo, &commandBuffer);
+    if (allocateCommandBufferResult != VK_SUCCESS) {
+        throw std::runtime_error("Could not allocate command buffer");
+    }
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // only going to use the command buffer once
+
+    VkResult beginCommandBufferResult = vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    if (beginCommandBufferResult != VK_SUCCESS) {
+        throw std::runtime_error("Could not begin Command Buffer");
+    }
+
+    return commandBuffer;
+}
+
+void HelloTriangleApplication::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    // no events to wait on, want to execute the transfer on the buffers immediately
+    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphicsQueue);
+
+    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+}
+
+void HelloTriangleApplication::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    // specify which part of the buffer is going to be copied to which part of the image
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0; // at which the pixel values start
+    // specifies how the pixels are laid out in memory
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    // which part of the image we want to copy the pixels
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {width, height, 1};
+
+    // assuming here that the image has already been transitioned to the layout that is optimal for copying pixels to.
+    vkCmdCopyBufferToImage(
+            commandBuffer,
+            buffer,
+            image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &region
+    );
+
+
+    endSingleTimeCommands(commandBuffer);
+}
+
 // #endregion
 
 // #region Public Methods
@@ -1688,8 +1807,6 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
-
-
 
 
 
