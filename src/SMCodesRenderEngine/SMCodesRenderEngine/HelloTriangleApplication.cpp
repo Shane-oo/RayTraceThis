@@ -114,19 +114,21 @@ void HelloTriangleApplication::initVulkan() {
     pickPhysicalDevice();
     createLogicalDevice();
     createSwapChain();
-    createImageViews();
+    createSwapChainImageViews();
     createRenderPass();
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
     createTextureImage();
+    createTextureImageView();
+    createTextureSampler();
     createVertexBuffer();
     createIndexBuffer();
     createUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
-    createCommandBuffers();
+    createDrawingCommandBuffers();
     createSyncObjects();
 }
 
@@ -162,6 +164,10 @@ void HelloTriangleApplication::cleanUp() {
     vkDestroyCommandPool(device, commandPool, nullptr);
 
     cleanupSwapChain();
+
+    vkDestroySampler(device, textureSampler, nullptr);
+
+    vkDestroyImageView(device, textureImageView, nullptr);
 
     vkDestroyImage(device, textureImage, nullptr);
     vkFreeMemory(device, textureImageMemory, nullptr);
@@ -402,6 +408,7 @@ bool HelloTriangleApplication::isDeviceSuitable(VkPhysicalDevice physDevice) {
     vkGetPhysicalDeviceFeatures(physDevice, &deviceFeatures);
 
     // dedicated graphic cards that support geometry shaders
+    // unused
     if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && deviceFeatures.geometryShader) {}
 
     // check the physDevice can process the commands we want to use
@@ -417,7 +424,8 @@ bool HelloTriangleApplication::isDeviceSuitable(VkPhysicalDevice physDevice) {
         swapChainAdequate = swapChainSupport.isAdequate();
     }
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate;
+
+    return indices.isComplete() && extensionsSupported && swapChainAdequate && deviceFeatures.samplerAnisotropy;
 }
 
 bool HelloTriangleApplication::checkDeviceExtensionSupport(VkPhysicalDevice physDevice) {
@@ -508,8 +516,8 @@ void HelloTriangleApplication::createLogicalDevice() {
     }
 
     // these are the features that we queried support for with vkGetPhysicalDeviceFeatures
-    // Right now don't need anything special, so leave everything with VK_FALSE
     VkPhysicalDeviceFeatures deviceFeatures{};
+    deviceFeatures.samplerAnisotropy = VK_TRUE;
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -637,7 +645,7 @@ void HelloTriangleApplication::recreateSwapChain() {
     cleanupSwapChain();
 
     createSwapChain();
-    createImageViews();
+    createSwapChainImageViews();
     createFramebuffers();
 }
 
@@ -743,35 +751,11 @@ VkExtent2D HelloTriangleApplication::chooseSwapExtent(const VkSurfaceCapabilitie
     }
 }
 
-void HelloTriangleApplication::createImageViews() {
+void HelloTriangleApplication::createSwapChainImageViews() {
     swapChainImageViews.resize(swapChainImages.size());
 
     for (size_t i = 0; i < swapChainImages.size(); i++) {
-        VkImageViewCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = swapChainImages[i];
-        // how the image data should be interpreted
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = swapChainImageFormat;
-
-        // components field allows you to swizzle the color channels around
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-        // subresourceRange field describes what the image's purpose is 
-        // our images will be used as color targets without any mipmapping levels or multiple layers
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1;
-
-        VkResult createResult = vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]);
-        if (createResult != VK_SUCCESS) {
-            throw std::runtime_error("failed to create image views!");
-        }
+        swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat);
     }
 }
 
@@ -1066,16 +1050,17 @@ void HelloTriangleApplication::createCommandPool() {
 }
 
 
-void HelloTriangleApplication::createCommandBuffers() {
-    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+void HelloTriangleApplication::createDrawingCommandBuffers() {
+    drawingCommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
     VkCommandBufferAllocateInfo allocateBufferInfo{};
     allocateBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocateBufferInfo.commandPool = commandPool;
     allocateBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // can be submitted to a queue for execution, but cannot be called from other command buffers
-    allocateBufferInfo.commandBufferCount = (uint32_t) commandBuffers.size();
+    allocateBufferInfo.commandBufferCount = (uint32_t) drawingCommandBuffers.size();
 
-    VkResult allocateBufferInfoResult = vkAllocateCommandBuffers(device, &allocateBufferInfo, commandBuffers.data());
+    VkResult allocateBufferInfoResult = vkAllocateCommandBuffers(device, &allocateBufferInfo,
+                                                                 drawingCommandBuffers.data());
     if (allocateBufferInfoResult != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffers");
     }
@@ -1246,9 +1231,9 @@ void HelloTriangleApplication::drawFrame() {
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
     // - Record a command buffer which draws the scene onto that image
-    vkResetCommandBuffer(commandBuffers[currentFrame], 0); // make sure command buffer is able to be recorded to
+    vkResetCommandBuffer(drawingCommandBuffers[currentFrame], 0); // make sure command buffer is able to be recorded to
 
-    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
+    recordCommandBuffer(drawingCommandBuffers[currentFrame], imageIndex);
 
     // - Submit the recorded command buffer
     VkSubmitInfo submitInfo{};
@@ -1263,7 +1248,7 @@ void HelloTriangleApplication::drawFrame() {
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+    submitInfo.pCommandBuffers = &drawingCommandBuffers[currentFrame];
 
     // specify which semaphores to signal once the command buffer(s) have finished execution
     VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
@@ -1825,6 +1810,84 @@ void HelloTriangleApplication::copyBufferToImage(VkBuffer buffer, VkImage image,
     endSingleTimeCommands(commandBuffer);
 }
 
+void HelloTriangleApplication::createTextureImageView() {
+    textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB);
+}
+
+VkImageView HelloTriangleApplication::createImageView(VkImage image, VkFormat format) {
+    VkImageViewCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    createInfo.image = image;
+    // how the image data should be interpreted
+    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    createInfo.format = format;
+
+    // components field allows you to swizzle the color channels around
+    createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    // subresourceRange field describes what the image's purpose is 
+    // our images will be used as color targets without any mipmapping levels or multiple layers
+    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    createInfo.subresourceRange.baseMipLevel = 0;
+    createInfo.subresourceRange.levelCount = 1;
+    createInfo.subresourceRange.baseArrayLayer = 0;
+    createInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    VkResult createResult = vkCreateImageView(device, &createInfo, nullptr, &imageView);
+    if (createResult != VK_SUCCESS) {
+        throw std::runtime_error("failed to create image views!");
+    }
+
+    return imageView;
+}
+
+void HelloTriangleApplication::createTextureSampler() {
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT; // Repeat the texture when going beyond the image dims
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+
+    std::cout << "Max anisotropy set to " << samplerInfo.maxAnisotropy << std::endl;
+
+    // what color should be returned when sampling beyond the image 
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+    // which coordinate system you want to use to address texels in an image
+    // if VK_TURE then use coordinates within the [0, texWidth) and [0, textHeight)
+    // if VK_FALSE then use coordinates are [0, 1)
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+    // if comparison is enabled, then texels will first be compared to a value, and the result of that 
+    // comparison is used in filtering operations
+    // mainly used for percentage-closer filtering on shadow maps
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+    // mipMapping
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    VkResult createSamplerResult = vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler);
+    if (createSamplerResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create texture sampler");
+    }
+}
+
 // #endregion
 
 // #region Public Methods
@@ -1834,6 +1897,10 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
+
+
+
+
 
 
 

@@ -61,7 +61,7 @@ private:
     VkPipeline graphicsPipeline;
     std::vector<VkFramebuffer> swapChainFramebuffers;
     VkCommandPool commandPool;
-    std::vector<VkCommandBuffer> commandBuffers;
+    std::vector<VkCommandBuffer> drawingCommandBuffers;
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
@@ -130,7 +130,7 @@ private:
 
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
-    void createImageViews();
+    void createSwapChainImageViews();
 
     void createRenderPass();
 
@@ -142,7 +142,7 @@ private:
 
     void createCommandPool();
 
-    void createCommandBuffers();
+    void createDrawingCommandBuffers();
 
     void recordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex);
 
@@ -159,6 +159,8 @@ private:
                       VkDeviceMemory &bufferMemory);
 
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
+    VkImageView createImageView(VkImage image, VkFormat format);
 
 private:
     struct Vertex {
@@ -259,6 +261,8 @@ private:
 private:
     VkImage textureImage;
     VkDeviceMemory textureImageMemory;
+    VkImageView textureImageView;
+    VkSampler textureSampler;
 
     void createTextureImage();
 
@@ -272,8 +276,12 @@ private:
                      VkDeviceMemory &imageMemory);
 
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-    
+
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+
+    void createTextureImageView();
+
+    void createTextureSampler();
 };
 
 
