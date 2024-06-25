@@ -26,6 +26,9 @@ endif()
 
 project ("SMCodesRenderEngine")
 
+# Include externalLibs
+include_directories("externalLibs")
+
 # Include sub-projects.
 add_subdirectory ("SMCodesRenderEngine")
 
