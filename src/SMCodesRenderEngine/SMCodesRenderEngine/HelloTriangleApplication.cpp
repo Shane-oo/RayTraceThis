@@ -8,9 +8,6 @@
 #define GLM_FORCE_RADIANS
 
 
-
-
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <GLFW/glfw3.h>
@@ -24,6 +21,7 @@
 #include <chrono>
 
 #define STB_IMAGE_IMPLEMENTATION
+
 #include <stb_image.h>
 
 // #region Constants
@@ -1700,11 +1698,31 @@ void HelloTriangleApplication::transitionImageLayout(VkImage image, VkFormat for
      *  We need to do that despite already using vkQueueWaitIdle to manually syn-chronize
     */
 
-    memoryBarrier.srcAccessMask = 0; // TODO
-    memoryBarrier.dstAccessMask = 0; // TODO
 
-    VkPipelineStageFlags srcStageMask = 0; //todo // which pipeline stage the operations occur that should happen before the barrier
-    VkPipelineStageFlags dstStageMask = 0; //todo // the pipeline stage in which operations will wait on the barrier
+    VkPipelineStageFlags sourceStage;  //which pipeline stage the operations occur that should happen before the barrier
+    VkPipelineStageFlags destinationStage; // the pipeline stage in which operations will wait on the barrier
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED
+        && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+
+        memoryBarrier.srcAccessMask = 0;
+        memoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+               && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+
+        memoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else {
+        throw std::invalid_argument("unsupported layout transition!");
+    }
+
+
     VkDependencyFlags dependencyFlags = 0;
     uint32_t memoryBarrierCount = 0;
     VkMemoryBarrier *pMemoryBarriers = nullptr;
@@ -1713,8 +1731,8 @@ void HelloTriangleApplication::transitionImageLayout(VkImage image, VkFormat for
     uint32_t imageMemoryBarrierCount = 1;
     vkCmdPipelineBarrier(
             commandBuffer,
-            srcStageMask,
-            dstStageMask,
+            sourceStage,
+            destinationStage,
             dependencyFlags,
             memoryBarrierCount,
             pMemoryBarriers,
