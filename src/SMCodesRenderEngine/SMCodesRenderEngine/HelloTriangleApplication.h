@@ -160,11 +160,11 @@ private:
 
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
-    VkImageView createImageView(VkImage image, VkFormat format);
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectFlags);
 
 private:
     struct Vertex {
-        glm::vec2 pos;
+        glm::vec3 pos;
         glm::vec3 colour;
         glm::vec2 textureCoord;
 
@@ -191,7 +191,7 @@ private:
             // position
             attributeDescriptions[0].binding = 0; // which binding the per-vertex data comes
             attributeDescriptions[0].location = 0; // references the location directive of the input in the vertex shader
-            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
             // the number of bytes since the start of the per-vertex data to read from
             attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
@@ -212,14 +212,35 @@ private:
     };
 
     const std::vector<Vertex> vertices = {
-            // rectangle
-            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
-            {{0.5f,  -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
-            {{0.5f,  0.5f},  {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
-            {{-0.5f, 0.5f},  {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}  // bottom-left
+            // rectangle 1
+            {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
+            {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
+            {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
+            {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},  // bottom-left
+
+            // rectangle 2
+            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
+            {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
+            {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
+            {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},  // bottom-left
+
+            // rectangle 3
+            {{-0.75f, -0.75f, -0.75f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
+            {{0.75f, -0.75f, -0.75f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
+            {{0.75f, 0.75f, -0.75f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
+            {{-0.75f, 0.75f, -0.75f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},  // bottom-left
+
+            // rectangle 4
+            {{-0.25f, -0.25f, 0.25f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
+            {{0.25f, -0.25f, 0.25f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
+            {{0.25f, 0.25f, 0.25f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
+            {{-0.25f, 0.25f, 0.25f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}  // bottom-left
     };
     const std::vector<uint16_t> indices = {
-            0, 1, 2, 2, 3, 0
+            0, 1, 2, 2, 3, 0,
+            4, 5, 6, 6, 7, 4,
+            8, 9, 10, 10, 11, 8,
+            12, 13, 14, 14, 15, 12
     };
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
@@ -289,6 +310,21 @@ private:
     void createTextureImageView();
 
     void createTextureSampler();
+
+private:
+    VkImage depthImage;
+    VkDeviceMemory depthImageMemory;
+    VkImageView depthImageView;
+    
+    void createDepthResources();
+    
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
+                                 VkImageTiling tiling,
+                                 VkFormatFeatureFlags features);
+    
+    VkFormat findDepthFormat();
+    
+    bool hasStencilComponent(VkFormat format);
 };
 
 
