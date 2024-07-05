@@ -6,6 +6,7 @@
 #define SMCODESRENDERENGINE_HELLOTRIANGLEAPPLICATION_H
 
 #define GLM_ENABLE_EXPERIMENTAL
+
 #include <glm/gtx/hash.hpp>
 
 #include <vulkan/vulkan_core.h>
@@ -18,8 +19,6 @@
 #include <glm/ext/matrix_float4x4.hpp>
 
 class GLFWwindow;
-
-
 
 
 class HelloTriangleApplication {
@@ -164,7 +163,7 @@ private:
 
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
-    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectFlags);
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectFlags, uint32_t mipLevels);
 
 public:
     struct Vertex {
@@ -215,11 +214,11 @@ public:
         }
 
 
-        bool operator==(const Vertex& other) const {
+        bool operator==(const Vertex &other) const {
             return pos == other.pos && colour == other.colour && textureCoord == other.textureCoord;
         }
     };
-    
+
 private:
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
@@ -269,6 +268,7 @@ private:
     void updateUniformBuffer(uint32_t currentImage);
 
 private:
+    uint32_t mipLevels;
     VkImage textureImage;
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;
@@ -278,6 +278,7 @@ private:
 
     void createImage(uint32_t width,
                      uint32_t height,
+                     uint32_t mipLevels,
                      VkFormat format,
                      VkImageTiling tiling,
                      VkImageUsageFlags usage,
@@ -285,7 +286,8 @@ private:
                      VkImage &image,
                      VkDeviceMemory &imageMemory);
 
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void transitionImageLayout(VkImage image, uint32_t mipLevels, VkFormat format, VkImageLayout oldLayout,
+                               VkImageLayout newLayout);
 
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
@@ -297,22 +299,26 @@ private:
     VkImage depthImage;
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
-    
+
     void createDepthResources();
-    
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
+
+    VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates,
                                  VkImageTiling tiling,
                                  VkFormatFeatureFlags features);
-    
+
     VkFormat findDepthFormat();
-    
+
     bool hasStencilComponent(VkFormat format);
-    
-private: 
-    void loadModel(); 
+
+private:
+    void loadModel();
+
+private:
+    void generateMipmaps(VkImage image, VkFormat imageFormat,
+                         uint32_t textureWidth,
+                         uint32_t textureHeight,
+                         uint32_t nMipLevels);
 };
-
-
 
 
 #endif //SMCODESRENDERENGINE_HELLOTRIANGLEAPPLICATION_H
