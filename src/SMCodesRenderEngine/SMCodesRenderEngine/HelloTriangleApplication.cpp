@@ -1635,7 +1635,7 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage) {
     float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     UniformBufferObject ubo{};
-    // rotate around the z-axis
+    // rotate 
     ubo.model = glm::rotate(glm::mat4(1.0f), deltaTime * glm::radians(20.0f), glm::vec3(-1.f, 0.0f, 3.0f));
 
     // view the geometry from above at a 45-degree angle
