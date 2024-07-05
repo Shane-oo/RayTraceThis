@@ -5,6 +5,8 @@
 #ifndef SMCODESRENDERENGINE_HELLOTRIANGLEAPPLICATION_H
 #define SMCODESRENDERENGINE_HELLOTRIANGLEAPPLICATION_H
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 
 #include <vulkan/vulkan_core.h>
 #include <vector>
@@ -17,8 +19,10 @@
 
 class GLFWwindow;
 
-class HelloTriangleApplication {
 
+
+
+class HelloTriangleApplication {
 
 public:
     void run();
@@ -162,7 +166,7 @@ private:
 
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectFlags);
 
-private:
+public:
     struct Vertex {
         glm::vec3 pos;
         glm::vec3 colour;
@@ -209,39 +213,17 @@ private:
 
             return attributeDescriptions;
         }
+
+
+        bool operator==(const Vertex& other) const {
+            return pos == other.pos && colour == other.colour && textureCoord == other.textureCoord;
+        }
     };
+    
+private:
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
 
-    const std::vector<Vertex> vertices = {
-            // rectangle 1
-            {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
-            {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
-            {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
-            {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},  // bottom-left
-
-            // rectangle 2
-            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
-            {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
-            {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
-            {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},  // bottom-left
-
-            // rectangle 3
-            {{-0.75f, -0.75f, -0.75f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
-            {{0.75f, -0.75f, -0.75f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
-            {{0.75f, 0.75f, -0.75f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
-            {{-0.75f, 0.75f, -0.75f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},  // bottom-left
-
-            // rectangle 4
-            {{-0.25f, -0.25f, 0.25f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // top-left
-            {{0.25f, -0.25f, 0.25f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},  // top-right
-            {{0.25f, 0.25f, 0.25f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // bottom-right
-            {{-0.25f, 0.25f, 0.25f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}  // bottom-left
-    };
-    const std::vector<uint16_t> indices = {
-            0, 1, 2, 2, 3, 0,
-            4, 5, 6, 6, 7, 4,
-            8, 9, 10, 10, 11, 8,
-            12, 13, 14, 14, 15, 12
-    };
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
@@ -325,7 +307,12 @@ private:
     VkFormat findDepthFormat();
     
     bool hasStencilComponent(VkFormat format);
+    
+private: 
+    void loadModel(); 
 };
+
+
 
 
 #endif //SMCODESRENDERENGINE_HELLOTRIANGLEAPPLICATION_H

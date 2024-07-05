@@ -6,6 +6,8 @@
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/shaders DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 # Copy the textures folder to the build and binary directory
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/textures DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# Copy the models folder to the build and binary directory
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/models DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # Add source to this project's executable.
 add_executable(SMCodesRenderEngine "SMCodesRenderEngine.cpp" "SMCodesRenderEngine.h"

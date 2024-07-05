@@ -25,6 +25,24 @@
 
 #include <stb_image.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+
+#include <tiny_obj_loader.h>
+#include <unordered_map>
+
+namespace std {
+    // wacky hash for unique vertices
+    template<>
+    struct std::hash<HelloTriangleApplication::Vertex> {
+        size_t operator()(HelloTriangleApplication::Vertex const &vertex) const {
+            return ((hash<glm::vec3>()(vertex.pos) ^
+                     (hash<glm::vec3>()(vertex.colour) << 1)) >> 1) ^
+                   (hash<glm::vec2>()(vertex.textureCoord) << 1);
+        }
+    };
+}
+
+
 // #region Constants
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -125,6 +143,7 @@ void HelloTriangleApplication::initVulkan() {
     createTextureImage();
     createTextureImageView();
     createTextureSampler();
+    loadModel();
     createVertexBuffer();
     createIndexBuffer();
     createUniformBuffers();
@@ -1219,7 +1238,7 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
 
-    vkCmdBindIndexBuffer(cmdBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(cmdBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
     uint32_t firstSet = 0;
     uint32_t descriptorSetCount = 1;
@@ -1636,7 +1655,12 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage) {
 
 void HelloTriangleApplication::createTextureImage() {
     int textureWidth, textureHeight, textureChannels;
-    stbi_uc *pixels = stbi_load("textures/leaf_512x512.png",
+    /*stbi_uc *pixels = stbi_load("textures/leaf_512x512.png",
+                                &textureWidth,
+                                &textureHeight,
+                                &textureChannels,
+                                STBI_rgb_alpha);*/
+    stbi_uc *pixels = stbi_load("textures/portal_4096x4096.png",
                                 &textureWidth,
                                 &textureHeight,
                                 &textureChannels,
@@ -2062,6 +2086,51 @@ bool HelloTriangleApplication::hasStencilComponent(VkFormat format) {
            || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
+void HelloTriangleApplication::loadModel() {
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
+
+    bool loaded = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, "models/portal.obj");
+    if (!loaded) {
+        throw std::runtime_error("Model did not load " + warn + err);
+    }
+
+    std::unordered_map<Vertex, uint32_t> uniqueVertices = {};
+
+    for (const auto &shape: shapes) {
+        for (const auto &index: shape.mesh.indices) {
+            Vertex vertex{};
+
+            vertex.pos = {
+                    attrib.vertices[3 * index.vertex_index + 0],
+                    attrib.vertices[3 * index.vertex_index + 1],
+                    attrib.vertices[3 * index.vertex_index + 2],
+            };
+
+            // we uploaded our image into Vulkan in a top to bottom orientation
+
+            vertex.textureCoord = {
+                    attrib.texcoords[2 * index.texcoord_index + 0],
+                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+
+            vertex.colour = {1.0f, 1.0f, 1.0f};
+
+            if (uniqueVertices.count(vertex) == 0) {
+                uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                vertices.push_back(vertex);
+            }
+
+            indices.push_back(uniqueVertices[vertex]);
+        }
+    }
+
+    std::cout << "Model loaded successfully. Vertices: " << vertices.size()
+              << " Indices: " << indices.size() << std::endl;
+}
+
 // #endregion
 
 // #region Public Methods
@@ -2071,6 +2140,8 @@ void HelloTriangleApplication::run() {
     mainLoop();
     cleanUp();
 }
+
+
 
 
 
