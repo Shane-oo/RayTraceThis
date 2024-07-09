@@ -279,6 +279,7 @@ private:
     void createImage(uint32_t width,
                      uint32_t height,
                      uint32_t mipLevels,
+                     VkSampleCountFlagBits numSamples,
                      VkFormat format,
                      VkImageTiling tiling,
                      VkImageUsageFlags usage,
@@ -318,6 +319,16 @@ private:
                          uint32_t textureWidth,
                          uint32_t textureHeight,
                          uint32_t nMipLevels);
+
+private:
+    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+    VkImage colourImage;
+    VkDeviceMemory colourImageMemory;
+    VkImageView colourImageView;
+
+    VkSampleCountFlagBits getMaxUsableSampleCount();
+    
+    void createColourResources();
 };
 
 
