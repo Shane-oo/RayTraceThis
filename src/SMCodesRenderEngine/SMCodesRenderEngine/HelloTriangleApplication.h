@@ -18,7 +18,8 @@
 #include <array>
 #include <glm/ext/matrix_float4x4.hpp>
 
-class GLFWwindow;
+// Had to change this to a struct for DEARIMGUI
+struct GLFWwindow;
 
 
 class HelloTriangleApplication {
@@ -329,6 +330,15 @@ private:
     VkSampleCountFlagBits getMaxUsableSampleCount();
     
     void createColourResources();
+    
+public:
+    VkDescriptorPool imGuiDescriptorPool;
+    VkRenderPass imGuiRenderPass;
+    
+    // ImGui
+    void InitImGui();
+    
+    void CreateDescriptorPoolForImGui();
 };
 
 

@@ -31,4 +31,10 @@ find_package(glm REQUIRED)
 # Link GLM Library
 target_link_directories(SMCodesRenderEngine PRIVATE glm)
 
-###
+#.\vcpkg install imgui[glfw-binding,core,vulkan-binding]:x64-windows --recurse
+# Find imgui
+find_package(imgui CONFIG REQUIRED)
+# Link imgui
+target_link_libraries(SMCodesRenderEngine PRIVATE imgui::imgui)
+
+

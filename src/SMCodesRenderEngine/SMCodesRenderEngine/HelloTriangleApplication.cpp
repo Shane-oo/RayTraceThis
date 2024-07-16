@@ -8,10 +8,8 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE // Vulkan depth range is 0.0 to 1.0
 
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <GLFW/glfw3.h>
 #include <cassert>
 #include <stdexcept>
 #include <vector>
@@ -20,6 +18,8 @@
 #include <algorithm>
 #include <fstream>
 #include <chrono>
+#include <imgui_impl_glfw.h>
+
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -29,6 +29,9 @@
 
 #include <tiny_obj_loader.h>
 #include <unordered_map>
+#include <GLFW/glfw3.h>
+#include <imgui_impl_vulkan.h>
+
 
 namespace std {
     // wacky hash for unique vertices
@@ -157,6 +160,8 @@ void HelloTriangleApplication::initVulkan() {
 void HelloTriangleApplication::mainLoop() {
     assert(window && "Window cannot be null");
 
+    // TODO MAIN LOOP FOR IM GUI
+    
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         drawFrame();
@@ -821,7 +826,9 @@ void HelloTriangleApplication::createRenderPass() {
     colourAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colourAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colourAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colourAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    //colourAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    // MODIFIED FOR IMGUI since this render pass is not last anymore gui is
+    colourAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     // Depth Attachment
     VkAttachmentDescription depthAttachment{};
@@ -886,6 +893,72 @@ void HelloTriangleApplication::createRenderPass() {
     if (renderPassCreateResult != VK_SUCCESS) {
         throw std::runtime_error("failed to create render pass!");
     }
+
+
+    // IMGUI RENDER PASS SETUP
+    // Reset and resuse structs
+
+    // Attachment
+    colorAttachment = {};
+    colorAttachment.format = swapChainImageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    // want GUI to be drawn over your main rendering.
+    // This tells Vulkan you don't want to clear the content of the framebuffer, but you want to draw over it instead 
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    // automatically transition our attachment to the right layout for presentation
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    // Color VkAttachmentReference our render pass needs.
+    colorAttachmentRef = {};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // subpass
+    subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    // synchronization and dependency 
+
+    /*
+     * Ok so our srcSubpass must be VK_SUBPASS_EXTERNAL to create a dependency outside the current render pass. 
+     * We can refer to our first and only subpass in dstSubpass by its index 0.
+     * Now we need to state what we’re waiting for. Before drawing our GUI, we want our geometry to be already rendered.
+     * That means we want the pixels to be already written to the framebuffer.
+     * Fortunately, there is a stage called VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT for that
+     * and we can set our srcStageMask to it. We can also set our dstStageMask to this same value
+     * because our GUI will also be drawn to the same target. 
+     * We’re basically waiting for pixels to be written before we can write pixels ourselves.
+    */
+    dependency = {};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo guiRenderPassCreateInfo = {};
+    guiRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    guiRenderPassCreateInfo.attachmentCount = 1;
+    guiRenderPassCreateInfo.pAttachments = &colorAttachment;
+    guiRenderPassCreateInfo.subpassCount = 1;
+    guiRenderPassCreateInfo.pSubpasses = &subpass;
+    guiRenderPassCreateInfo.dependencyCount = 1;
+    guiRenderPassCreateInfo.pDependencies = &dependency;
+
+    VkResult guiRenderPassCreateResult = vkCreateRenderPass(device, &guiRenderPassCreateInfo, nullptr,
+                                                            &imGuiRenderPass);
+    if (guiRenderPassCreateResult != VK_SUCCESS) {
+        throw std::runtime_error("Could not create Dear ImGui's render pass");
+    }
+
+    std::cout << "Successfully create imGuiRenderPass" << std::endl;
 }
 
 void HelloTriangleApplication::createGraphicsPipeline() {
@@ -2358,7 +2431,79 @@ void HelloTriangleApplication::createColourResources() {
     );
 
     colourImageView = createImageView(colourImage, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+}
 
+void HelloTriangleApplication::InitImGui() {
+    CreateDescriptorPoolForImGui();
+
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void) io;
+
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplGlfw_InitForVulkan(window, true);
+    ImGui_ImplVulkan_InitInfo initInfo = {};
+    initInfo.Instance = vulkanInstance;
+    initInfo.PhysicalDevice = physicalDevice;
+    initInfo.Device = device;
+    // need a graphics queue as Dear ImGui will only be drawing stuff
+    initInfo.QueueFamily = findQueueFamilies(physicalDevice).graphicsFamily.value();
+    initInfo.Queue = graphicsQueue;
+    initInfo.PipelineCache = VK_NULL_HANDLE; // Optional
+    initInfo.DescriptorPool = imGuiDescriptorPool;
+    initInfo.Allocator = nullptr;
+
+
+    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+    // how many images we would like to have in the swap chain
+    // it is recommended to request at least one more image than the minimum
+    // to avoid waiting on the driver to complete internal operations
+    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+    // double check did not exceed max number ( 0 is a special value indicating no maximum)
+    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+        imageCount = swapChainSupport.capabilities.maxImageCount;
+    }
+    initInfo.MinImageCount = swapChainSupport.capabilities.minImageCount;
+    initInfo.ImageCount = imageCount;
+
+    initInfo.CheckVkResultFn = nullptr;
+    bool success = ImGui_ImplVulkan_Init(&initInfo, imGuiRenderPass);
+    if(!success){
+        throw std::runtime_error("Failed to Init ImGui_ImplVulkan");
+    }
+    
+    // maybe not needed
+    //VkCommandBuffer fontCommandBuffer = beginSingleTimeCommands();
+    ImGui_ImplVulkan_CreateFontsTexture(); 
+    //endSingleTimeCommands(fontCommandBuffer);
+}
+
+void HelloTriangleApplication::CreateDescriptorPoolForImGui() {
+
+    std::array<VkDescriptorPoolSize, 1> poolSizes{};
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[0].descriptorCount = 1;
+
+
+    VkDescriptorPoolCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    createInfo.maxSets = 1;
+    createInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    createInfo.pPoolSizes = poolSizes.data();
+    VkResult createResult = vkCreateDescriptorPool(device, &createInfo, nullptr, &imGuiDescriptorPool);
+    if (createResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create imGuiDescriptorPool");
+    }
+
+    std::cout << "Created imGuiDescriptorPool" << std::endl;
 }
 
 // #endregion
@@ -2367,9 +2512,11 @@ void HelloTriangleApplication::createColourResources() {
 void HelloTriangleApplication::run() {
     initWindow();
     initVulkan();
+    InitImGui();
     mainLoop();
     cleanUp();
 }
+
 
 
 
