@@ -17,6 +17,7 @@
 #include <glm/vec3.hpp>
 #include <array>
 #include <glm/ext/matrix_float4x4.hpp>
+#include <imgui.h>
 
 // Had to change this to a struct for DEARIMGUI
 struct GLFWwindow;
@@ -150,7 +151,7 @@ private:
 
     void recordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex);
 
-    void drawFrame();
+    void drawFrame(ImVec4 clearColor);
 
     void createSyncObjects();
 
@@ -334,11 +335,12 @@ private:
 public:
     VkDescriptorPool imGuiDescriptorPool;
     VkRenderPass imGuiRenderPass;
-    
+    VkCommandPool imGuiCommandPool;
+    std::vector<VkCommandBuffer> imGuiCommandBuffers;
+    std::vector<VkFramebuffer> imGuiFrameBuffers;
+
     // ImGui
     void InitImGui();
-    
-    void CreateDescriptorPoolForImGui();
 };
 
 

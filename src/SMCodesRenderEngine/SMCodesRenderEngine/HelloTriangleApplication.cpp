@@ -114,7 +114,7 @@ void HelloTriangleApplication::initWindow() {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     // allow window resize events
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // should be GLFW_TRUE
 
     window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 
@@ -160,11 +160,22 @@ void HelloTriangleApplication::initVulkan() {
 void HelloTriangleApplication::mainLoop() {
     assert(window && "Window cannot be null");
 
-    // TODO MAIN LOOP FOR IM GUI
-    
+    ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.0f);
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-        drawFrame();
+
+        // Start the Dear ImGui frame
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
+
+        // Rendering
+        ImGui::Render();
+
+        drawFrame(clearColor);
+
     }
 
     vkDeviceWaitIdle(device);
@@ -876,7 +887,9 @@ void HelloTriangleApplication::createRenderPass() {
     // when we want to start writing colors to it
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
                               | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    // Allow write operations, since we have a load operation that clears
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
     // Render pass
     std::array<VkAttachmentDescription, 3> attachments = {colorAttachment, depthAttachment, colourAttachmentResolve};
@@ -907,21 +920,21 @@ void HelloTriangleApplication::createRenderPass() {
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     // automatically transition our attachment to the right layout for presentation
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     // Color VkAttachmentReference our render pass needs.
-    colorAttachmentRef = {};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VkAttachmentReference colorAttachmentRef2 = {};
+    colorAttachmentRef2.attachment = 0;
+    colorAttachmentRef2.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     // subpass
     subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pColorAttachments = &colorAttachmentRef2;
 
     // synchronization and dependency 
 
@@ -940,7 +953,7 @@ void HelloTriangleApplication::createRenderPass() {
     dependency.dstSubpass = 0;
     dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.srcAccessMask = 0; // or VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
     VkRenderPassCreateInfo guiRenderPassCreateInfo = {};
@@ -1167,6 +1180,8 @@ VkShaderModule HelloTriangleApplication::createShaderModule(const std::vector<ch
 
 void HelloTriangleApplication::createFramebuffers() {
     swapChainFramebuffers.resize(swapChainImages.size());
+    imGuiFrameBuffers.resize(swapChainImageViews.size());
+
     // iterate through the image views and create framebuffers from them
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
 
@@ -1196,8 +1211,31 @@ void HelloTriangleApplication::createFramebuffers() {
             throw std::runtime_error("failed to create framebuffer");
         }
 
+        // ImGui Frame Buffer
+        VkImageView imGuiAttachment[1];
+        framebufferInfo = {};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = imGuiRenderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = imGuiAttachment;
+        framebufferInfo.width = swapChainExtent.width;
+        framebufferInfo.height = swapChainExtent.height;
+        framebufferInfo.layers = 1;
+        imGuiAttachment[0] = swapChainImageViews[i]; // this is where I was a dumbass
+
+        VkResult imGuiFrameBufferCreateResult = vkCreateFramebuffer(device,
+                                                                    &framebufferInfo,
+                                                                    nullptr,
+                                                                    &imGuiFrameBuffers[i]);
+        if (imGuiFrameBufferCreateResult != VK_SUCCESS) {
+            throw std::runtime_error("failed to create  imGui framebuffer");
+        }
+
+
         std::cout << "Created Frame Buffer for swapChainImageViews[" << i << "]" << std::endl;
     }
+
+    std::cout << "What is this size" << imGuiFrameBuffers.size() << std::endl;
 }
 
 void HelloTriangleApplication::createCommandPool() {
@@ -1213,7 +1251,13 @@ void HelloTriangleApplication::createCommandPool() {
         throw std::runtime_error("Failed to create command pool!");
     }
 
-    std::cout << "Successfully created Command Pool" << std::endl;
+    // ImGui Command Pool
+    VkResult createImGuiCommandPoolResult = vkCreateCommandPool(device, &poolInfo, nullptr, &imGuiCommandPool);
+    if (createCommandPoolResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create imGui command pool!");
+    }
+
+    std::cout << "Successfully created Command Pools" << std::endl;
 }
 
 
@@ -1224,12 +1268,27 @@ void HelloTriangleApplication::createDrawingCommandBuffers() {
     allocateBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocateBufferInfo.commandPool = commandPool;
     allocateBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // can be submitted to a queue for execution, but cannot be called from other command buffers
-    allocateBufferInfo.commandBufferCount = (uint32_t) drawingCommandBuffers.size();
+    allocateBufferInfo.commandBufferCount = static_cast<std::uint32_t>(drawingCommandBuffers.size());
 
     VkResult allocateBufferInfoResult = vkAllocateCommandBuffers(device, &allocateBufferInfo,
                                                                  drawingCommandBuffers.data());
     if (allocateBufferInfoResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate command buffers");
+        throw std::runtime_error("Failed to allocate drawing command buffers");
+    }
+
+    // ImGui Command Buffer
+    imGuiCommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+    allocateBufferInfo = {};
+    allocateBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocateBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocateBufferInfo.commandPool = imGuiCommandPool;
+    allocateBufferInfo.commandBufferCount = (uint32_t) imGuiCommandBuffers.size();
+
+    VkResult allocateImGuiBufferInfoResult = vkAllocateCommandBuffers(device, &allocateBufferInfo,
+                                                                      imGuiCommandBuffers.data());
+    if (allocateImGuiBufferInfoResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate ImGui command buffers");
     }
 
     std::cout << "Successfully allocated command buffers" << std::endl;
@@ -1372,11 +1431,11 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
         throw std::runtime_error("failed to record command buffer");
     }
 
-    //std::cout << "Successfully Recorded Command Buffer" << std::endl;
+    std::cout << "Successfully Recorded Command Buffer" << std::endl;
 }
 
 
-void HelloTriangleApplication::drawFrame() {
+void HelloTriangleApplication::drawFrame(ImVec4 clearColor) {
     // Rendering a frame in Vulkan consists of:
     // - Wait for the previous frame to finish
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -1407,6 +1466,48 @@ void HelloTriangleApplication::drawFrame() {
 
     recordCommandBuffer(drawingCommandBuffers[currentFrame], imageIndex);
 
+    // Recording ImGui Command Buffer
+    VkCommandBufferBeginInfo imGuiBufferBeginInfo = {};
+    imGuiBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    imGuiBufferBeginInfo.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    VkResult imGuiBufferBeginResult = vkBeginCommandBuffer(imGuiCommandBuffers[currentFrame], &imGuiBufferBeginInfo);
+    if (imGuiBufferBeginResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin buffer for ImGuiCommandBuffers");
+    }
+
+    // ImGui Render Pass
+    VkClearValue clearValue = {};
+    memcpy(&clearValue.color.float32[0], &clearColor, 4 * sizeof(float));
+
+    VkRenderPassBeginInfo imGuiRenderPassBeginInfo = {};
+    imGuiRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    imGuiRenderPassBeginInfo.renderPass = imGuiRenderPass;
+    imGuiRenderPassBeginInfo.framebuffer = imGuiFrameBuffers[imageIndex];
+    imGuiRenderPassBeginInfo.renderArea.extent.width = swapChainExtent.width;
+    imGuiRenderPassBeginInfo.renderArea.extent.height = swapChainExtent.height;
+    imGuiRenderPassBeginInfo.clearValueCount = 1;
+    imGuiRenderPassBeginInfo.pClearValues = &clearValue;
+    vkCmdBeginRenderPass(imGuiCommandBuffers[currentFrame],
+                         &imGuiRenderPassBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+
+    // ImGui Render Command
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+                                    imGuiCommandBuffers[currentFrame]);
+
+    // Submit Imgui Command Buffer
+    vkCmdEndRenderPass(imGuiCommandBuffers[currentFrame]);
+    VkResult endCommandBufferResult = vkEndCommandBuffer(imGuiCommandBuffers[currentFrame]);
+    if (endCommandBufferResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to end Im Gui Command Buffer");
+    }
+
+    std::array<VkCommandBuffer, 2> submitCommandBuffers = {
+            drawingCommandBuffers[currentFrame],
+            imGuiCommandBuffers[currentFrame]
+    };
+
     // - Submit the recorded command buffer
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1419,8 +1520,8 @@ void HelloTriangleApplication::drawFrame() {
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
 
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &drawingCommandBuffers[currentFrame];
+    submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
+    submitInfo.pCommandBuffers = submitCommandBuffers.data();
 
     // specify which semaphores to signal once the command buffer(s) have finished execution
     VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
@@ -1432,7 +1533,8 @@ void HelloTriangleApplication::drawFrame() {
         throw std::runtime_error("failed to submit draw command buffer");
     }
 
-    //std::cout << "Successfully submitted draw command buffer" << std::endl;
+
+    std::cout << "Successfully submitted command buffers" << std::endl;
 
     // - Present the swap chain image
     VkPresentInfoKHR presentInfo{};
@@ -1638,6 +1740,30 @@ void HelloTriangleApplication::createDescriptorPool() {
     VkResult createDescriptorPoolResult = vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool);
     if (createDescriptorPoolResult != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool");
+    }
+
+    // ImGui Descriptor Pool
+    VkDescriptorPoolSize pool_sizes[] = {
+            {VK_DESCRIPTOR_TYPE_SAMPLER,                1000},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+            {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1000}};
+    poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    poolInfo.maxSets = 1;
+    poolInfo.poolSizeCount = 10;
+    poolInfo.pPoolSizes = pool_sizes;
+    VkResult createImGuiDescriptorPoolResult = vkCreateDescriptorPool(device, &poolInfo, nullptr, &imGuiDescriptorPool);
+    if (createImGuiDescriptorPoolResult != VK_SUCCESS) {
+        throw std::runtime_error("failed to create imGui descriptor pool");
     }
 
     std::cout << "Descriptor Pool successfully created" << std::endl;
@@ -2434,15 +2560,15 @@ void HelloTriangleApplication::createColourResources() {
 }
 
 void HelloTriangleApplication::InitImGui() {
-    CreateDescriptorPoolForImGui();
-
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     (void) io;
-
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |=
+            ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |=
+            ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -2461,49 +2587,22 @@ void HelloTriangleApplication::InitImGui() {
     initInfo.Allocator = nullptr;
 
 
-    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
-    // how many images we would like to have in the swap chain
-    // it is recommended to request at least one more image than the minimum
-    // to avoid waiting on the driver to complete internal operations
-    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-    // double check did not exceed max number ( 0 is a special value indicating no maximum)
-    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
-        imageCount = swapChainSupport.capabilities.maxImageCount;
-    }
-    initInfo.MinImageCount = swapChainSupport.capabilities.minImageCount;
+    auto imageCount = static_cast<uint32_t>(swapChainImages.size());
+    initInfo.MinImageCount = imageCount;
     initInfo.ImageCount = imageCount;
+
+    initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
     initInfo.CheckVkResultFn = nullptr;
     bool success = ImGui_ImplVulkan_Init(&initInfo, imGuiRenderPass);
-    if(!success){
+    if (!success) {
         throw std::runtime_error("Failed to Init ImGui_ImplVulkan");
     }
-    
+
     // maybe not needed
     //VkCommandBuffer fontCommandBuffer = beginSingleTimeCommands();
-    ImGui_ImplVulkan_CreateFontsTexture(); 
+    // ImGui_ImplVulkan_CreateFontsTexture();
     //endSingleTimeCommands(fontCommandBuffer);
-}
-
-void HelloTriangleApplication::CreateDescriptorPoolForImGui() {
-
-    std::array<VkDescriptorPoolSize, 1> poolSizes{};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[0].descriptorCount = 1;
-
-
-    VkDescriptorPoolCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    createInfo.maxSets = 1;
-    createInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    createInfo.pPoolSizes = poolSizes.data();
-    VkResult createResult = vkCreateDescriptorPool(device, &createInfo, nullptr, &imGuiDescriptorPool);
-    if (createResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create imGuiDescriptorPool");
-    }
-
-    std::cout << "Created imGuiDescriptorPool" << std::endl;
 }
 
 // #endregion
