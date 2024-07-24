@@ -114,7 +114,7 @@ void HelloTriangleApplication::initWindow() {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     // allow window resize events
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // should be GLFW_TRUE
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
     window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 
@@ -217,6 +217,18 @@ void HelloTriangleApplication::cleanUp() {
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
+
+    // ImGui Resource Cleanup
+    vkDestroyRenderPass(device, imGuiRenderPass, nullptr);
+
+    vkDestroyCommandPool(device, imGuiCommandPool, nullptr);
+
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    vkDestroyDescriptorPool(device, imGuiDescriptorPool, nullptr);
+
 
     vkDestroyDevice(device, nullptr);
 
@@ -704,6 +716,11 @@ void HelloTriangleApplication::cleanupSwapChain() {
 
     for (auto framebuffer: swapChainFramebuffers) {
         vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
+
+    // ImGui FrameBuffers
+    for (auto frameBuffer: imGuiFrameBuffers) {
+        vkDestroyFramebuffer(device, frameBuffer, nullptr);
     }
 
     for (auto imageView: swapChainImageViews) {
@@ -1431,7 +1448,7 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer cmdBuffer, ui
         throw std::runtime_error("failed to record command buffer");
     }
 
-    std::cout << "Successfully Recorded Command Buffer" << std::endl;
+    //std::cout << "Successfully Recorded Command Buffer" << std::endl;
 }
 
 
@@ -1534,7 +1551,7 @@ void HelloTriangleApplication::drawFrame(ImVec4 clearColor) {
     }
 
 
-    std::cout << "Successfully submitted command buffers" << std::endl;
+    //std::cout << "Successfully submitted command buffers" << std::endl;
 
     // - Present the swap chain image
     VkPresentInfoKHR presentInfo{};
